@@ -44,15 +44,23 @@ def generate_launch_description():
         default_value='True',
         description='Whether to respawn if a node crashes. Applied when composition is disabled.')
 
+    use_sim_time_arg = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='False',
+        description='Use simulation clock if true',
+    )
+
     avia_params_file = LaunchConfiguration('avia_params_file')
     camera_params_file = LaunchConfiguration('camera_params_file')
     use_respawn = LaunchConfiguration('use_respawn')
+    use_sim_time = LaunchConfiguration('use_sim_time')
 
     return LaunchDescription([
         use_rviz_arg,
         avia_config_arg,
         camera_config_arg,
         use_respawn_arg,
+        use_sim_time_arg,
 
         # play ros2 bag
         # ExecuteProcess(
@@ -75,6 +83,9 @@ def generate_launch_description():
                 ("in",  "/left_camera/image"), 
                 ("out", "/left_camera/image")
             ],
+            parameters=[
+                {"use_sim_time": use_sim_time}
+            ],
             output="screen",
             respawn=use_respawn,
         ),
@@ -86,6 +97,7 @@ def generate_launch_description():
             parameters=[
                 avia_params_file,
                 camera_params_file,
+                {"use_sim_time": use_sim_time}
             ],
             # https://docs.ros.org/en/humble/How-To-Guides/Getting-Backtraces-in-ROS-2.html
             prefix=[
@@ -101,6 +113,9 @@ def generate_launch_description():
             executable="rviz2",
             name="rviz2",
             arguments=["-d", rviz_config_file],
+            parameters=[
+                {"use_sim_time": use_sim_time}
+            ],
             output="screen"
         ),
     ])
