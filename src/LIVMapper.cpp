@@ -936,7 +936,7 @@ void LIVMapper::imu_cbk(const sensor_msgs::msg::Imu::ConstSharedPtr &msg_in)
 
   if (fabs(last_timestamp_lidar - timestamp) > 0.5 && (!ros_driver_fix_en))
   {
-    RCLCPP_WARN(this->node->get_logger(), "IMU and LiDAR not synced! delta time: %lf .\n", last_timestamp_lidar - timestamp);
+    // RCLCPP_WARN(this->node->get_logger(), "IMU and LiDAR not synced! delta time: %lf .\n", last_timestamp_lidar - timestamp);
   }
 
   if (ros_driver_fix_en) timestamp += std::round(last_timestamp_lidar - timestamp);
