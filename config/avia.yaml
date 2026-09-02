@@ -71,6 +71,8 @@
 
     publish:
       dense_map_en: true
+      metric_cloud_en: true
+      metric_cloud_topic: "/cloud_registered_metric"
       pub_effect_point_en: false 
       pub_plane_en: false
       pub_scan_num: 1

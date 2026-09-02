@@ -127,6 +127,8 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   try_declare.template operator()<int>("publish.pub_scan_num", 1);
   try_declare.template operator()<bool>("publish.pub_effect_point_en", false);
   try_declare.template operator()<bool>("publish.dense_map_en", false);
+  try_declare.template operator()<bool>("publish.metric_cloud_en", false);
+  try_declare.template operator()<std::string>("publish.metric_cloud_topic", "/cloud_registered_metric");
 
   // get parameter
   this->node->get_parameter("common.lid_topic", lid_topic);
@@ -190,6 +192,8 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   this->node->get_parameter("publish.pub_scan_num", pub_scan_num);
   this->node->get_parameter("publish.pub_effect_point_en", pub_effect_point_en);
   this->node->get_parameter("publish.dense_map_en", dense_map_en);
+  this->node->get_parameter("publish.metric_cloud_en", metric_cloud_en);
+  this->node->get_parameter("publish.metric_cloud_topic", metric_cloud_topic);
 }
 
 void LIVMapper::initializeComponents(rclcpp::Node::SharedPtr &node) 
@@ -322,6 +326,10 @@ void LIVMapper::initializeSubscribersAndPublishers(rclcpp::Node::SharedPtr &node
       img_topic, 200000, std::bind(&LIVMapper::img_cbk, this, std::placeholders::_1));
   }
   pubLaserCloudFullRes = this->node->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", 100);
+  if (metric_cloud_en)
+  {
+    pubLaserCloudMetric = this->node->create_publisher<sensor_msgs::msg::PointCloud2>(metric_cloud_topic, 100);
+  }
   pubNormal = this->node->create_publisher<visualization_msgs::msg::MarkerArray>("/visualization_marker", 100);
   pubSubVisualMap = this->node->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_visual_sub_map_before", 100);
   pubLaserCloudEffect = this->node->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_effected", 100);
@@ -606,6 +614,15 @@ void LIVMapper::handleLIO()
     RGBpointBodyToWorld(&laserCloudFullRes->points[i], &laserCloudWorld->points[i]);
   }
   *pcl_w_wait_pub = *laserCloudWorld;
+
+  if (metric_cloud_en && pubLaserCloudMetric && !laserCloudWorld->empty())
+  {
+    sensor_msgs::msg::PointCloud2 metric_cloud_msg;
+    pcl::toROSMsg(*laserCloudWorld, metric_cloud_msg);
+    metric_cloud_msg.header.stamp = sec2Stamp(LidarMeasures.last_lio_update_time);
+    metric_cloud_msg.header.frame_id = "camera_init";
+    pubLaserCloudMetric->publish(metric_cloud_msg);
+  }
 
   publish_frame_world(pubLaserCloudFullRes, vio_manager);
   if (pub_effect_point_en) publish_effect_world(pubLaserCloudEffect, voxelmap_manager->ptpl_list_);
