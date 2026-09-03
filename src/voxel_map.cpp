@@ -366,6 +366,7 @@ VoxelOctoTree *VoxelOctoTree::Insert(const pointWithVar &pv)
 
 void VoxelMapManager::StateEstimation(StatesGroup &state_propagat)
 {
+  lidar_information_snapshot_.reset();
   cross_mat_list_.clear();
   cross_mat_list_.reserve(feats_down_size_);
   body_cov_list_.clear();
@@ -513,6 +514,24 @@ void VoxelMapManager::StateEstimation(StatesGroup &state_propagat)
     /*** Convergence Judgements and Covariance Update ***/
     if (!EKF_stop_flg && (rematch_num >= 2 || (iterCount == config_setting_.max_iterations_ - 1)))
     {
+      const Eigen::Matrix<double, 6, 6>
+          final_lidar_information =
+              H_T_H.block<6, 6>(0, 0);
+
+      const double mean_abs_residual =
+          effct_feat_num_ > 0
+              ? total_residual /
+                    static_cast<double>(
+                        effct_feat_num_)
+              : 0.0;
+
+      lidar_information_snapshot_.capture(
+          final_lidar_information,
+          static_cast<std::size_t>(
+              effct_feat_num_),
+          mean_abs_residual,
+          iterCount);
+
       /*** Covariance Update ***/
       // _state.cov = (I_STATE - G) * _state.cov;
       state_.cov.block<DIM_STATE, DIM_STATE>(0, 0) =
