@@ -249,6 +249,20 @@ if(BUILD_TESTING)
         ${EIGEN3_INCLUDE_DIR}
     )
   endif()
+
+  ament_add_gtest(
+    test_lidar_directional_localizability
+    test/test_lidar_directional_localizability.cpp
+  )
+
+  if(TARGET test_lidar_directional_localizability)
+    target_include_directories(
+      test_lidar_directional_localizability
+      PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+  endif()
 endif()
 
 ament_package()
