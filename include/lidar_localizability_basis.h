@@ -34,6 +34,38 @@ struct LidarLocalizabilitySample
 };
 
 /**
+ * Build one localizability sample from FAST-LIVO2 frame contracts.
+ *
+ * rotation_global_imu = R_GI maps IMU-frame vectors into global.
+ * rotation_imu_lidar  = R_IL maps LiDAR-frame vectors into IMU.
+ *
+ * Therefore:
+ *
+ *   n_L = R_IL^T R_GI^T n_G
+ *
+ * The point is already expressed in the LiDAR frame and is preserved.
+ */
+inline LidarLocalizabilitySample
+makeLidarLocalizabilitySample(
+    const Eigen::Vector3d &point_lidar_m,
+    const Eigen::Vector3d &normal_global,
+    const Eigen::Matrix3d &rotation_global_imu,
+    const Eigen::Matrix3d &rotation_imu_lidar)
+{
+  LidarLocalizabilitySample sample;
+
+  sample.point_lidar_m =
+      point_lidar_m;
+
+  sample.normal_lidar =
+      rotation_imu_lidar.transpose() *
+      rotation_global_imu.transpose() *
+      normal_global;
+
+  return sample;
+}
+
+/**
  * Raw geometric localizability basis.
  *
  * This structure contains geometric Gram matrices and their

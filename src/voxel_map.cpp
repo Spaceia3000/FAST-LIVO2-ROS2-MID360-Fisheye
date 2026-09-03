@@ -367,6 +367,8 @@ VoxelOctoTree *VoxelOctoTree::Insert(const pointWithVar &pv)
 void VoxelMapManager::StateEstimation(StatesGroup &state_propagat)
 {
   lidar_information_snapshot_.reset();
+  lidar_localizability_basis_snapshot_ =
+      LidarLocalizabilityBasisSnapshot{};
   cross_mat_list_.clear();
   cross_mat_list_.reserve(feats_down_size_);
   body_cov_list_.clear();
@@ -402,6 +404,11 @@ void VoxelMapManager::StateEstimation(StatesGroup &state_propagat)
   for (int iterCount = 0; iterCount < config_setting_.max_iterations_; iterCount++)
   {
     double total_residual = 0.0;
+
+    // Preserve the exact pose used to build this iteration's
+    // correspondences and LiDAR measurement Jacobian.
+    const M3D rotation_global_imu_linearization =
+        state_.rot_end;
     pcl::PointCloud<pcl::PointXYZI>::Ptr world_lidar(new pcl::PointCloud<pcl::PointXYZI>);
     TransformLidar(state_.rot_end, state_.pos_end, feats_down_body_, world_lidar);
     M3D rot_var = state_.cov.block<3, 3>(0, 0);
@@ -531,6 +538,26 @@ void VoxelMapManager::StateEstimation(StatesGroup &state_propagat)
               effct_feat_num_),
           mean_abs_residual,
           iterCount);
+
+      std::vector<LidarLocalizabilitySample>
+          localizability_samples;
+
+      localizability_samples.reserve(
+          ptpl_list_.size());
+
+      for (const auto &ptpl : ptpl_list_)
+      {
+        localizability_samples.push_back(
+            makeLidarLocalizabilitySample(
+                ptpl.point_b_,
+                ptpl.normal_,
+                rotation_global_imu_linearization,
+                extR_));
+      }
+
+      lidar_localizability_basis_snapshot_ =
+          computeLidarLocalizabilityBasis(
+              localizability_samples);
 
       /*** Covariance Update ***/
       // _state.cov = (I_STATE - G) * _state.cov;

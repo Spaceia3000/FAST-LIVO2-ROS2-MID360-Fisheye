@@ -204,3 +204,55 @@ TEST(
       ).norm(),
       kTolerance);
 }
+
+
+TEST(
+    LidarLocalizabilityBasis,
+    ConvertsGlobalNormalUsingVerifiedGlobalImuAndImuLidarRotations)
+{
+  // R_GI: +90 deg around Z.
+  Eigen::Matrix3d rotation_global_imu;
+  rotation_global_imu <<
+      0.0, -1.0, 0.0,
+      1.0,  0.0, 0.0,
+      0.0,  0.0, 1.0;
+
+  // R_IL: +90 deg around X.
+  Eigen::Matrix3d rotation_imu_lidar;
+  rotation_imu_lidar <<
+      1.0, 0.0,  0.0,
+      0.0, 0.0, -1.0,
+      0.0, 1.0,  0.0;
+
+  const Eigen::Vector3d expected_point_lidar(
+      2.0, -1.0, 0.5);
+
+  const Eigen::Vector3d expected_normal_lidar =
+      Eigen::Vector3d::UnitY();
+
+  const Eigen::Vector3d normal_global =
+      rotation_global_imu *
+      rotation_imu_lidar *
+      expected_normal_lidar;
+
+  const auto sample =
+      makeLidarLocalizabilitySample(
+          expected_point_lidar,
+          normal_global,
+          rotation_global_imu,
+          rotation_imu_lidar);
+
+  EXPECT_LT(
+      (
+          sample.point_lidar_m -
+          expected_point_lidar
+      ).norm(),
+      kTolerance);
+
+  EXPECT_LT(
+      (
+          sample.normal_lidar -
+          expected_normal_lidar
+      ).norm(),
+      kTolerance);
+}
