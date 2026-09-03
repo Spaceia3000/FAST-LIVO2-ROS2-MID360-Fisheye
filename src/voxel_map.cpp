@@ -65,6 +65,47 @@ void loadVoxelConfig(rclcpp::Node::SharedPtr &node, VoxelMapConfig &voxel_config
   try_declare.template operator()<int>("local_map.half_map_size", 100);
   try_declare.template operator()<double>("local_map.sliding_thresh", 8.0);
 
+  // LiDAR geometry/localizability policy.
+  //
+  // Numerical defaults are intentionally invalid. They must be
+  // calibrated for the active LiDAR / correspondence pipeline before
+  // the policy can become active.
+  try_declare.template operator()<bool>(
+      "localizability.enabled",
+      false);
+
+  try_declare.template operator()<double>(
+      "localizability.aggregation.minimal_contribution_threshold",
+      -1.0);
+
+  try_declare.template operator()<double>(
+      "localizability.aggregation.strong_contribution_threshold",
+      -1.0);
+
+  try_declare.template operator()<double>(
+      "localizability.classification.kappa_1_full",
+      -1.0);
+
+  try_declare.template operator()<double>(
+      "localizability.classification.kappa_2_partial",
+      -1.0);
+
+  try_declare.template operator()<double>(
+      "localizability.classification.kappa_3_minimum",
+      -1.0);
+
+  try_declare.template operator()<std::string>(
+      "localizability.provenance.profile_id",
+      "");
+
+  try_declare.template operator()<std::string>(
+      "localizability.provenance.calibration_source",
+      "");
+
+  try_declare.template operator()<std::string>(
+      "localizability.provenance.calibration_version",
+      "");
+
   // get parameter
   node->get_parameter("publish.pub_plane_en", voxel_config.is_pub_plane_map_);
   node->get_parameter("lio.max_layer", voxel_config.max_layer_);
@@ -79,6 +120,70 @@ void loadVoxelConfig(rclcpp::Node::SharedPtr &node, VoxelMapConfig &voxel_config
   node->get_parameter("local_map.map_sliding_en", voxel_config.map_sliding_en);
   node->get_parameter("local_map.half_map_size", voxel_config.half_map_size);
   node->get_parameter("local_map.sliding_thresh", voxel_config.sliding_thresh);
+
+  node->get_parameter(
+      "localizability.enabled",
+      voxel_config.lidar_geometry_policy_.enabled);
+
+  node->get_parameter(
+      "localizability.aggregation.minimal_contribution_threshold",
+      voxel_config.lidar_geometry_policy_
+          .aggregation_policy
+          .minimal_contribution_threshold);
+
+  node->get_parameter(
+      "localizability.aggregation.strong_contribution_threshold",
+      voxel_config.lidar_geometry_policy_
+          .aggregation_policy
+          .strong_contribution_threshold);
+
+  node->get_parameter(
+      "localizability.classification.kappa_1_full",
+      voxel_config.lidar_geometry_policy_
+          .classification_policy
+          .kappa_1_full);
+
+  node->get_parameter(
+      "localizability.classification.kappa_2_partial",
+      voxel_config.lidar_geometry_policy_
+          .classification_policy
+          .kappa_2_partial);
+
+  node->get_parameter(
+      "localizability.classification.kappa_3_minimum",
+      voxel_config.lidar_geometry_policy_
+          .classification_policy
+          .kappa_3_minimum);
+
+  node->get_parameter(
+      "localizability.provenance.profile_id",
+      voxel_config.lidar_geometry_policy_
+          .provenance
+          .profile_id);
+
+  node->get_parameter(
+      "localizability.provenance.calibration_source",
+      voxel_config.lidar_geometry_policy_
+          .provenance
+          .calibration_source);
+
+  node->get_parameter(
+      "localizability.provenance.calibration_version",
+      voxel_config.lidar_geometry_policy_
+          .provenance
+          .calibration_version);
+
+  if (
+      voxel_config.lidar_geometry_policy_.enabled &&
+      !voxel_config.lidar_geometry_policy_.thresholds_valid())
+  {
+    RCLCPP_WARN(
+        node->get_logger(),
+        "LiDAR localizability policy was enabled, but its thresholds "
+        "are invalid or incomplete. Derived aggregation/classification "
+        "will remain unavailable until a valid calibrated policy is "
+        "provided.");
+  }
 }
 
 void VoxelOctoTree::init_plane(const std::vector<pointWithVar> &points, VoxelPlane *plane)

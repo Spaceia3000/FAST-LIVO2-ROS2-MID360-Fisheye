@@ -16,6 +16,7 @@ which is included as part of this source code package.
 #include "common_lib.h"
 #include "lidar_information_snapshot.h"
 #include "lidar_localizability_basis.h"
+#include "lidar_geometry_evidence_runtime_policy.h"
 #include <Eigen/Dense>
 #include <fstream>
 #include <math.h>
@@ -51,6 +52,9 @@ typedef struct VoxelMapConfig
   double sliding_thresh;
   bool map_sliding_en;
   int half_map_size;
+
+  LidarGeometryEvidenceRuntimePolicy
+      lidar_geometry_policy_;
 } VoxelMapConfig;
 
 typedef struct PointToPlane
