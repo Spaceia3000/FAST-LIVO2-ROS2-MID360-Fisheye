@@ -80,11 +80,13 @@ endif()
 
 # Find ament and required dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(pcl_ros REQUIRED)
 find_package(pcl_conversions REQUIRED)
@@ -99,6 +101,16 @@ find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Sophus REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread)
+
+
+# Generate FAST-LIVO2 ROS 2 transport interfaces.
+rosidl_generate_interfaces(
+  ${PROJECT_NAME}
+  "msg/LidarMeasurementInformation.msg"
+  DEPENDENCIES
+    std_msgs
+)
+
 
 # Include directories for dependencies
 include_directories(
