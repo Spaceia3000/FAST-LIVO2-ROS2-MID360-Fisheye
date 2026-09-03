@@ -291,6 +291,20 @@ if(BUILD_TESTING)
         ${EIGEN3_INCLUDE_DIR}
     )
   endif()
+
+  ament_add_gtest(
+    test_lidar_geometry_evidence
+    test/test_lidar_geometry_evidence.cpp
+  )
+
+  if(TARGET test_lidar_geometry_evidence)
+    target_include_directories(
+      test_lidar_geometry_evidence
+      PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+  endif()
 endif()
 
 ament_package()
