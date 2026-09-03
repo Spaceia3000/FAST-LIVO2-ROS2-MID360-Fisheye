@@ -233,4 +233,22 @@ ament_export_dependencies(
   Sophus
 )
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(
+    test_lidar_localizability_basis
+    test/test_lidar_localizability_basis.cpp
+  )
+
+  if(TARGET test_lidar_localizability_basis)
+    target_include_directories(
+      test_lidar_localizability_basis
+      PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+  endif()
+endif()
+
 ament_package()
