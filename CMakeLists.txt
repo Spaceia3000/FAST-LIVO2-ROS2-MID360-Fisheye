@@ -111,6 +111,12 @@ rosidl_generate_interfaces(
     std_msgs
 )
 
+rosidl_get_typesupport_target(
+  cpp_typesupport_target
+  ${PROJECT_NAME}
+  rosidl_typesupport_cpp
+)
+
 
 # Include directories for dependencies
 include_directories(
@@ -163,6 +169,7 @@ ament_target_dependencies(laser_mapping ${dependencies})
 
 # linking libraries or executables to public dependencies
 target_link_libraries(laser_mapping 
+    "${cpp_typesupport_target}"
     ${CMAKE_SOURCE_DIR}/../../install/vikit_common/lib/libvikit_common.so 
     ${CMAKE_SOURCE_DIR}/../../install/vikit_ros/lib/libvikit_ros.so
     ${COMMON_DEPENDENCIES}
@@ -179,6 +186,7 @@ ament_target_dependencies(fastlivo_mapping ${dependencies})
 
 # Link libraries to the executable
 target_link_libraries(fastlivo_mapping
+  "${cpp_typesupport_target}"
   laser_mapping
   vio
   lio

@@ -16,6 +16,7 @@ which is included as part of this source code package.
 #include "IMU_Processing.h"
 #include "vio.h"
 #include "preprocess.h"
+#include "fast_livo/msg/lidar_measurement_information.hpp"
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.hpp>
 #include <tf2_ros/transform_broadcaster.h>
@@ -56,6 +57,8 @@ public:
   void publish_visual_sub_map(const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr &pubSubVisualMap);
   void publish_effect_world(const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr &pubLaserCloudEffect, const std::vector<PointToPlane> &ptpl_list);
   void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr &pmavros_pose_publisherubOdomAftMapped);
+  void publish_lidar_measurement_information(
+    const rclcpp::Publisher<fast_livo::msg::LidarMeasurementInformation>::SharedPtr &publisher);
   void publish_mavros(const rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr &mavros_pose_publisher);
   void publish_path(const rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr &pubPath);
   void readParameters(rclcpp::Node::SharedPtr &node);
@@ -73,6 +76,7 @@ public:
   string root_dir;
   string lid_topic, imu_topic, seq_name, img_topic;
   string metric_cloud_topic;
+  string lidar_information_topic;
   V3D extT;
   M3D extR;
 
@@ -109,6 +113,7 @@ public:
   bool lidar_pushed = false, imu_en, gravity_est_en, flg_reset = false, ba_bg_est_en = true;
   bool dense_map_en = false;
   bool metric_cloud_en = false;
+  bool lidar_information_en = false;
   int img_en = 1, imu_int_frame = 3;
   bool normal_en = true;
   bool exposure_estimate_en = false;
@@ -172,6 +177,7 @@ public:
   rclcpp::Subscription<sensor_msgs::msg::CompressedImage>::SharedPtr sub_img_compressed;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudFullRes;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudMetric;
+  rclcpp::Publisher<fast_livo::msg::LidarMeasurementInformation>::SharedPtr pubLidarMeasurementInformation;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pubNormal;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubSubVisualMap;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudEffect;

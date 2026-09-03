@@ -129,6 +129,8 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   try_declare.template operator()<bool>("publish.dense_map_en", false);
   try_declare.template operator()<bool>("publish.metric_cloud_en", false);
   try_declare.template operator()<std::string>("publish.metric_cloud_topic", "/cloud_registered_metric");
+  try_declare.template operator()<bool>("publish.lidar_information_en", false);
+  try_declare.template operator()<std::string>("publish.lidar_information_topic", "/lidar_measurement_information");
 
   // get parameter
   this->node->get_parameter("common.lid_topic", lid_topic);
@@ -194,6 +196,8 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   this->node->get_parameter("publish.dense_map_en", dense_map_en);
   this->node->get_parameter("publish.metric_cloud_en", metric_cloud_en);
   this->node->get_parameter("publish.metric_cloud_topic", metric_cloud_topic);
+  this->node->get_parameter("publish.lidar_information_en", lidar_information_en);
+  this->node->get_parameter("publish.lidar_information_topic", lidar_information_topic);
 }
 
 void LIVMapper::initializeComponents(rclcpp::Node::SharedPtr &node) 
@@ -329,6 +333,14 @@ void LIVMapper::initializeSubscribersAndPublishers(rclcpp::Node::SharedPtr &node
   if (metric_cloud_en)
   {
     pubLaserCloudMetric = this->node->create_publisher<sensor_msgs::msg::PointCloud2>(metric_cloud_topic, 100);
+  }
+  if (lidar_information_en)
+  {
+    pubLidarMeasurementInformation =
+      this->node->create_publisher<
+        fast_livo::msg::LidarMeasurementInformation>(
+          lidar_information_topic,
+          10);
   }
   pubNormal = this->node->create_publisher<visualization_msgs::msg::MarkerArray>("/visualization_marker", 100);
   pubSubVisualMap = this->node->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_visual_sub_map_before", 100);
@@ -580,6 +592,13 @@ void LIVMapper::handleLIO()
   euler_cur = RotMtoEuler(_state.rot_end);
   geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
   publish_odometry(pubOdomAftMapped);
+  if (
+    lidar_information_en &&
+    pubLidarMeasurementInformation)
+  {
+    publish_lidar_measurement_information(
+      pubLidarMeasurementInformation);
+  }
 
   double t3 = omp_get_wtime();
 
@@ -1495,6 +1514,60 @@ template <typename T> void LIVMapper::set_posestamp(T &out)
   out.orientation.y = geoQuat.y;
   out.orientation.z = geoQuat.z;
   out.orientation.w = geoQuat.w;
+}
+
+void LIVMapper::publish_lidar_measurement_information(
+  const rclcpp::Publisher<
+    fast_livo::msg::LidarMeasurementInformation>::SharedPtr &publisher)
+{
+  if (!publisher) {
+    return;
+  }
+
+  const auto & snapshot =
+    voxelmap_manager->lidar_information_snapshot_;
+
+  fast_livo::msg::LidarMeasurementInformation msg;
+
+  // Reuse the already-established odometry temporal/frame contract.
+  msg.header = odomAftMapped.header;
+  msg.body_frame_id =
+    odomAftMapped.child_frame_id;
+
+  msg.available =
+    snapshot.available;
+
+  msg.effective_features =
+    static_cast<std::uint64_t>(
+      snapshot.effective_features);
+
+  msg.mean_abs_point_to_plane_residual_m =
+    snapshot.mean_abs_point_to_plane_residual_m;
+
+  msg.final_iteration_index =
+    snapshot.final_iteration_index;
+
+  constexpr std::size_t kPoseDof = 6U;
+
+  for (
+    std::size_t row = 0U;
+    row < kPoseDof;
+    ++row)
+  {
+    for (
+      std::size_t col = 0U;
+      col < kPoseDof;
+      ++col)
+    {
+      msg.measurement_information[
+        row * kPoseDof + col] =
+        snapshot.measurement_information(
+          static_cast<Eigen::Index>(row),
+          static_cast<Eigen::Index>(col));
+    }
+  }
+
+  publisher->publish(msg);
 }
 
 void LIVMapper::publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr &pubOdomAftMapped)
