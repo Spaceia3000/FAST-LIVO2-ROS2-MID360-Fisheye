@@ -16,6 +16,7 @@ which is included as part of this source code package.
 #include "common_lib.h"
 #include "lidar_information_snapshot.h"
 #include "lidar_localizability_basis.h"
+#include "lidar_localizability_calibration_summary.h"
 #include "lidar_geometry_evidence_runtime_policy.h"
 #include <Eigen/Dense>
 #include <fstream>
@@ -55,6 +56,9 @@ typedef struct VoxelMapConfig
 
   LidarGeometryEvidenceRuntimePolicy
       lidar_geometry_policy_;
+
+  LidarLocalizabilityCalibrationPolicy
+      lidar_localizability_calibration_policy_;
 } VoxelMapConfig;
 
 typedef struct PointToPlane
@@ -220,6 +224,8 @@ public:
   int effct_feat_num_;
   LidarInformationSnapshot lidar_information_snapshot_;
   LidarLocalizabilityBasisSnapshot lidar_localizability_basis_snapshot_;
+  LidarLocalizabilityCalibrationSummary
+      lidar_localizability_calibration_summary_;
   std::vector<M3D> cross_mat_list_;
   std::vector<M3D> body_cov_list_;
   std::vector<pointWithVar> pv_list_;

@@ -106,6 +106,18 @@ void loadVoxelConfig(rclcpp::Node::SharedPtr &node, VoxelMapConfig &voxel_config
       "localizability.provenance.calibration_version",
       "");
 
+  // Threshold-independent calibration telemetry.
+  //
+  // Disabled by default. A positive histogram bin count is required
+  // before collection can become active.
+  try_declare.template operator()<bool>(
+      "localizability.calibration.enabled",
+      false);
+
+  try_declare.template operator()<int>(
+      "localizability.calibration.histogram_bins",
+      0);
+
   // get parameter
   node->get_parameter("publish.pub_plane_en", voxel_config.is_pub_plane_map_);
   node->get_parameter("lio.max_layer", voxel_config.max_layer_);
@@ -173,6 +185,18 @@ void loadVoxelConfig(rclcpp::Node::SharedPtr &node, VoxelMapConfig &voxel_config
           .provenance
           .calibration_version);
 
+  node->get_parameter(
+      "localizability.calibration.enabled",
+      voxel_config
+          .lidar_localizability_calibration_policy_
+          .enabled);
+
+  node->get_parameter(
+      "localizability.calibration.histogram_bins",
+      voxel_config
+          .lidar_localizability_calibration_policy_
+          .histogram_bins);
+
   if (
       voxel_config.lidar_geometry_policy_.enabled &&
       !voxel_config.lidar_geometry_policy_.thresholds_valid())
@@ -183,6 +207,21 @@ void loadVoxelConfig(rclcpp::Node::SharedPtr &node, VoxelMapConfig &voxel_config
         "are invalid or incomplete. Derived aggregation/classification "
         "will remain unavailable until a valid calibrated policy is "
         "provided.");
+  }
+
+  if (
+      voxel_config
+          .lidar_localizability_calibration_policy_
+          .enabled &&
+      !voxel_config
+          .lidar_localizability_calibration_policy_
+          .configuration_valid())
+  {
+    RCLCPP_WARN(
+        node->get_logger(),
+        "LiDAR localizability calibration was enabled, but "
+        "histogram_bins is not positive. Calibration telemetry "
+        "will remain unavailable.");
   }
 }
 
@@ -474,6 +513,8 @@ void VoxelMapManager::StateEstimation(StatesGroup &state_propagat)
   lidar_information_snapshot_.reset();
   lidar_localizability_basis_snapshot_ =
       LidarLocalizabilityBasisSnapshot{};
+  lidar_localizability_calibration_summary_ =
+      LidarLocalizabilityCalibrationSummary{};
   cross_mat_list_.clear();
   cross_mat_list_.reserve(feats_down_size_);
   body_cov_list_.clear();
@@ -663,6 +704,26 @@ void VoxelMapManager::StateEstimation(StatesGroup &state_propagat)
       lidar_localizability_basis_snapshot_ =
           computeLidarLocalizabilityBasis(
               localizability_samples);
+
+      if (
+          config_setting_
+              .lidar_localizability_calibration_policy_
+              .active())
+      {
+        const auto directional =
+            computeLidarDirectionalLocalizability(
+                localizability_samples,
+                lidar_localizability_basis_snapshot_);
+
+        lidar_localizability_calibration_summary_ =
+            buildLidarLocalizabilityCalibrationSummary(
+                lidar_localizability_basis_snapshot_,
+                directional,
+                static_cast<std::size_t>(
+                    config_setting_
+                        .lidar_localizability_calibration_policy_
+                        .histogram_bins));
+      }
 
       /*** Covariance Update ***/
       // _state.cov = (I_STATE - G) * _state.cov;

@@ -235,3 +235,53 @@ TEST(
   EXPECT_FALSE(result.available);
 }
 
+
+
+TEST(
+    LidarLocalizabilityCalibrationPolicy,
+    DefaultPolicyIsInactive)
+{
+  const LidarLocalizabilityCalibrationPolicy policy;
+
+  EXPECT_FALSE(policy.enabled);
+  EXPECT_FALSE(policy.configuration_valid());
+  EXPECT_FALSE(policy.active());
+}
+
+TEST(
+    LidarLocalizabilityCalibrationPolicy,
+    EnabledWithoutBinsIsInactive)
+{
+  LidarLocalizabilityCalibrationPolicy policy;
+
+  policy.enabled = true;
+
+  EXPECT_FALSE(policy.configuration_valid());
+  EXPECT_FALSE(policy.active());
+}
+
+TEST(
+    LidarLocalizabilityCalibrationPolicy,
+    PositiveBinCountActivatesPolicy)
+{
+  LidarLocalizabilityCalibrationPolicy policy;
+
+  policy.enabled = true;
+  policy.histogram_bins = 8;
+
+  EXPECT_TRUE(policy.configuration_valid());
+  EXPECT_TRUE(policy.active());
+}
+
+TEST(
+    LidarLocalizabilityCalibrationPolicy,
+    NegativeBinCountIsInvalid)
+{
+  LidarLocalizabilityCalibrationPolicy policy;
+
+  policy.enabled = true;
+  policy.histogram_bins = -1;
+
+  EXPECT_FALSE(policy.configuration_valid());
+  EXPECT_FALSE(policy.active());
+}

@@ -11,6 +11,35 @@
 
 #include "lidar_directional_localizability.h"
 
+/**
+ * Runtime policy for threshold-independent calibration telemetry.
+ *
+ * This policy controls only calibration-data collection.
+ * It does NOT activate localizability classification, health decisions,
+ * degeneracy mitigation, or any ESIKF modification.
+ *
+ * histogram_bins is a telemetry-resolution parameter, not a
+ * localizability threshold.
+ */
+struct LidarLocalizabilityCalibrationPolicy
+{
+  bool enabled{false};
+
+  int histogram_bins{0};
+
+  bool configuration_valid() const
+  {
+    return histogram_bins > 0;
+  }
+
+  bool active() const
+  {
+    return
+        enabled &&
+        configuration_valid();
+  }
+};
+
 struct LidarContributionHistogram
 {
   std::vector<std::uint64_t> count;
