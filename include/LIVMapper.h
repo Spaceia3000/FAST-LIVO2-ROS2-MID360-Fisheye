@@ -60,6 +60,8 @@ public:
   void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr &pmavros_pose_publisherubOdomAftMapped);
   void publish_lidar_measurement_information(
     const rclcpp::Publisher<fast_livo::msg::LidarMeasurementInformation>::SharedPtr &publisher);
+  void publish_lidar_localizability_calibration(
+    const rclcpp::Publisher<fast_livo::msg::LidarLocalizabilityCalibration>::SharedPtr &publisher);
   void publish_mavros(const rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr &mavros_pose_publisher);
   void publish_path(const rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr &pubPath);
   void readParameters(rclcpp::Node::SharedPtr &node);

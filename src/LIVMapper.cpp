@@ -628,6 +628,11 @@ void LIVMapper::handleLIO()
   euler_cur = RotMtoEuler(_state.rot_end);
   geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
   publish_odometry(pubOdomAftMapped);
+  if (pubLidarLocalizabilityCalibration)
+  {
+    publish_lidar_localizability_calibration(
+      pubLidarLocalizabilityCalibration);
+  }
   if (
     lidar_information_en &&
     pubLidarMeasurementInformation)
@@ -1638,6 +1643,29 @@ void LIVMapper::publish_lidar_measurement_information(
   }
 
   publisher->publish(msg);
+}
+
+void LIVMapper::publish_lidar_localizability_calibration(
+  const rclcpp::Publisher<
+    fast_livo::msg::LidarLocalizabilityCalibration>::SharedPtr &publisher)
+{
+  if (!publisher)
+  {
+    return;
+  }
+
+  const LidarLocalizabilityCalibrationSummary snapshot =
+    voxelmap_manager->lidar_localizability_calibration_summary_;
+  auto message =
+    lidar_localizability_calibration_transport::
+      serializeLidarLocalizabilityCalibration(snapshot);
+
+  lidar_localizability_calibration_transport::applyRuntimeEnvelope(
+    odomAftMapped.header.stamp,
+    LidarMeasures.pcl_proc_cur_frame,
+    message);
+
+  publisher->publish(message);
 }
 
 void LIVMapper::publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr &pubOdomAftMapped)

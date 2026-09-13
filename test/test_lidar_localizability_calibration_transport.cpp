@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <gtest/gtest.h>
+#include <rclcpp/time.hpp>
 
 #include "lidar_localizability_calibration_transport.h"
 
@@ -16,6 +17,8 @@ namespace
 
 using CalibrationMessage =
     fast_livo::msg::LidarLocalizabilityCalibration;
+using lidar_localizability_calibration_transport::
+    applyRuntimeEnvelope;
 using lidar_localizability_calibration_transport::
     serializeLidarLocalizabilityCalibration;
 using CalibrationTransportPolicy =
@@ -411,4 +414,128 @@ TEST(
   static_assert(!HasClassification<CalibrationMessage>::value);
 
   SUCCEED();
+}
+
+TEST(
+    LidarLocalizabilityCalibrationTransport,
+    RuntimeEnvelopePreservesExactStampAndUsesValidLidarFrame)
+{
+  const builtin_interfaces::msg::Time known_stamp =
+      static_cast<builtin_interfaces::msg::Time>(
+          rclcpp::Time(123, 456789123U, RCL_ROS_TIME));
+  LidarFrameProvenance provenance;
+  provenance.addContribution("lidar_sensor_optical", 37U);
+  auto message =
+      serializeLidarLocalizabilityCalibration(makeAvailableSummary());
+  message.header.frame_id = "camera_init";
+
+  applyRuntimeEnvelope(known_stamp, provenance, message);
+
+  EXPECT_EQ(message.header.stamp.sec, 123);
+  EXPECT_EQ(message.header.stamp.nanosec, 456789123U);
+  EXPECT_EQ(message.header.frame_id, "lidar_sensor_optical");
+  EXPECT_NE(message.header.frame_id, "camera_init");
+  EXPECT_TRUE(message.available);
+}
+
+TEST(
+    LidarLocalizabilityCalibrationTransport,
+    UnavailablePayloadStaysUnavailableWithValidFrame)
+{
+  LidarLocalizabilityCalibrationSummary summary =
+      makeAvailableSummary();
+  summary.available = false;
+  auto message =
+      serializeLidarLocalizabilityCalibration(summary);
+  LidarFrameProvenance provenance;
+  provenance.addContribution("lidar_frame", 1U);
+
+  applyRuntimeEnvelope(
+      builtin_interfaces::msg::Time{}, provenance, message);
+
+  EXPECT_FALSE(message.available);
+  EXPECT_EQ(message.header.frame_id, "lidar_frame");
+}
+
+TEST(
+    LidarLocalizabilityCalibrationTransport,
+    InvalidFrameProvenanceClearsFrameAndForcesUnavailable)
+{
+  LidarFrameProvenance no_contribution;
+  LidarFrameProvenance empty_frame;
+  empty_frame.addContribution("", 1U);
+  LidarFrameProvenance conflicting_frames;
+  conflicting_frames.addContribution("lidar_a", 1U);
+  conflicting_frames.addContribution("lidar_b", 1U);
+
+  const std::array<LidarFrameProvenance, 3> invalid_provenances{
+      no_contribution, empty_frame, conflicting_frames};
+
+  for (const auto &provenance : invalid_provenances)
+  {
+    auto message =
+        serializeLidarLocalizabilityCalibration(
+            makeAvailableSummary());
+    message.header.frame_id = "camera_init";
+
+    applyRuntimeEnvelope(
+        builtin_interfaces::msg::Time{}, provenance, message);
+
+    EXPECT_FALSE(message.available);
+    EXPECT_TRUE(message.header.frame_id.empty());
+  }
+}
+
+TEST(
+    LidarLocalizabilityCalibrationTransport,
+    RuntimeEnvelopeDoesNotAlterSerializedPayload)
+{
+  auto message =
+      serializeLidarLocalizabilityCalibration(makeAvailableSummary());
+  const auto payload_before = message;
+  LidarFrameProvenance provenance;
+  provenance.addContribution("lidar_frame", 1U);
+
+  applyRuntimeEnvelope(
+      static_cast<builtin_interfaces::msg::Time>(
+          rclcpp::Time(77, 123U, RCL_ROS_TIME)),
+      provenance,
+      message);
+
+  EXPECT_EQ(message.input_samples, payload_before.input_samples);
+  EXPECT_EQ(message.used_samples, payload_before.used_samples);
+  EXPECT_EQ(message.histogram_bins, payload_before.histogram_bins);
+  EXPECT_EQ(
+      message.rotation_contribution_normalization_radius_m,
+      payload_before.rotation_contribution_normalization_radius_m);
+  EXPECT_EQ(
+      message.rotation_gram_matrix,
+      payload_before.rotation_gram_matrix);
+  EXPECT_EQ(
+      message.translation_gram_matrix,
+      payload_before.translation_gram_matrix);
+  EXPECT_EQ(
+      message.rotation_eigenvalues,
+      payload_before.rotation_eigenvalues);
+  EXPECT_EQ(
+      message.rotation_eigenvectors,
+      payload_before.rotation_eigenvectors);
+  EXPECT_EQ(
+      message.translation_eigenvalues,
+      payload_before.translation_eigenvalues);
+  EXPECT_EQ(
+      message.translation_eigenvectors,
+      payload_before.translation_eigenvectors);
+  EXPECT_EQ(
+      message.rotation_histogram_count,
+      payload_before.rotation_histogram_count);
+  EXPECT_EQ(
+      message.rotation_histogram_sum,
+      payload_before.rotation_histogram_sum);
+  EXPECT_EQ(
+      message.translation_histogram_count,
+      payload_before.translation_histogram_count);
+  EXPECT_EQ(
+      message.translation_histogram_sum,
+      payload_before.translation_histogram_sum);
 }

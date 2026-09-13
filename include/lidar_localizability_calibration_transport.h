@@ -7,10 +7,12 @@
 #include <string>
 
 #include <Eigen/Core>
+#include <builtin_interfaces/msg/time.hpp>
 #include <rclcpp/qos.hpp>
 
 #include "fast_livo/msg/lidar_localizability_calibration.hpp"
 #include "lidar_directional_localizability.h"
+#include "lidar_frame_provenance.h"
 #include "lidar_localizability_calibration_summary.h"
 
 namespace lidar_localizability_calibration_transport
@@ -116,6 +118,18 @@ serializeLidarLocalizabilityCalibration(
   }
 
   return message;
+}
+
+inline void
+applyRuntimeEnvelope(
+    const builtin_interfaces::msg::Time &stamp,
+    const LidarFrameProvenance &frame_provenance,
+    fast_livo::msg::LidarLocalizabilityCalibration &message)
+{
+  message.header.stamp = stamp;
+  message.header.frame_id = frame_provenance.frameId();
+  message.available =
+      message.available && frame_provenance.valid();
 }
 
 }  // namespace lidar_localizability_calibration_transport
