@@ -23,6 +23,7 @@ which is included as part of this source code package.
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2/LinearMath/Transform.hpp>
 #include <tf2/LinearMath/Quaternion.hpp>
+#include "lidar_frame_provenance.h"
 
 using namespace std;
 // using namespace Eigen;   // avoid cmake error: reference to 'Matrix' is ambiguous
@@ -83,6 +84,8 @@ struct LidarMeasureGroup
   PointCloudXYZI::Ptr lidar;
   PointCloudXYZI::Ptr pcl_proc_cur;
   PointCloudXYZI::Ptr pcl_proc_next;
+  LidarFrameProvenance pcl_proc_cur_frame;
+  LidarFrameProvenance pcl_proc_next_frame;
   deque<struct MeasureGroup> measures;
   EKF_STATE lio_vio_flg;
   int lidar_scan_index_now;

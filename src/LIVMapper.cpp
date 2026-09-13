@@ -911,12 +911,16 @@ void LIVMapper::standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::ConstShare
   if (cur_head_time < last_timestamp_lidar)
   {
     RCLCPP_ERROR(this->node->get_logger(),"lidar loop back, clear buffer");
-    lid_raw_data_buffer.clear();
+    clearLidarInputBuffers(
+        lid_raw_data_buffer,
+        lid_header_time_buffer,
+        lid_frame_id_buffer);
   }
   PointCloudXYZI::Ptr ptr(new PointCloudXYZI());
   p_pre->process(msg, ptr);
   lid_raw_data_buffer.push_back(ptr);
   lid_header_time_buffer.push_back(cur_head_time);
+  lid_frame_id_buffer.push_back(msg->header.frame_id);
   last_timestamp_lidar = cur_head_time;
 
   mtx_buffer.unlock();
@@ -940,7 +944,10 @@ void LIVMapper::livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::ConstShar
   if (cur_head_time < last_timestamp_lidar)
   {
     RCLCPP_ERROR(this->node->get_logger(), "lidar loop back, clear buffer");
-    lid_raw_data_buffer.clear();
+    clearLidarInputBuffers(
+        lid_raw_data_buffer,
+        lid_header_time_buffer,
+        lid_frame_id_buffer);
   }
   RCLCPP_INFO(this->node->get_logger(), "get point cloud at time: %.6f", stamp2Sec(msg->header.stamp));
   PointCloudXYZI::Ptr ptr(new PointCloudXYZI());
@@ -954,6 +961,7 @@ void LIVMapper::livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::ConstShar
 
   lid_raw_data_buffer.push_back(ptr);
   lid_header_time_buffer.push_back(cur_head_time);
+  lid_frame_id_buffer.push_back(msg->header.frame_id);
   last_timestamp_lidar = cur_head_time;
 
   mtx_buffer.unlock();
@@ -1084,6 +1092,10 @@ bool LIVMapper::sync_packages(LidarMeasureGroup &meas)
       meas.lidar_frame_beg_time = lid_header_time_buffer.front();                                                // generate lidar_frame_beg_time
       meas.lidar_frame_end_time = meas.lidar_frame_beg_time + meas.lidar->points.back().curvature / double(1000); // calc lidar scan end time
       meas.pcl_proc_cur = meas.lidar;
+      meas.pcl_proc_cur_frame.reset();
+      meas.pcl_proc_cur_frame.addContribution(
+          lid_frame_id_buffer.front(),
+          meas.lidar->points.size());
       lidar_pushed = true;                                                                                       // flag
     }
 
@@ -1108,6 +1120,7 @@ bool LIVMapper::sync_packages(LidarMeasureGroup &meas)
     }
     lid_raw_data_buffer.pop_front();
     lid_header_time_buffer.pop_front();
+    lid_frame_id_buffer.pop_front();
     mtx_buffer.unlock();
     sig_buffer.notify_all();
 
@@ -1183,6 +1196,9 @@ bool LIVMapper::sync_packages(LidarMeasureGroup &meas)
 
       *(meas.pcl_proc_cur) = *(meas.pcl_proc_next);
       PointCloudXYZI().swap(*meas.pcl_proc_next);
+      advanceLidarFramePartitions(
+          meas.pcl_proc_cur_frame,
+          meas.pcl_proc_next_frame);
 
       int lid_frame_num = lid_raw_data_buffer.size();
       int max_size = meas.pcl_proc_cur->size() + 24000 * lid_frame_num;
@@ -1195,7 +1211,11 @@ bool LIVMapper::sync_packages(LidarMeasureGroup &meas)
         if (lid_header_time_buffer.front() > img_capture_time) break;
         auto pcl(lid_raw_data_buffer.front()->points);
         double frame_header_time(lid_header_time_buffer.front());
+        const std::string frame_id(
+            lid_frame_id_buffer.front());
         float max_offs_time_ms = (m.lio_time - frame_header_time) * 1000.0f;
+        std::size_t current_point_count = 0U;
+        std::size_t next_point_count = 0U;
 
         for (int i = 0; i < pcl.size(); i++)
         {
@@ -1204,15 +1224,24 @@ bool LIVMapper::sync_packages(LidarMeasureGroup &meas)
           {
             pt.curvature += (frame_header_time - meas.last_lio_update_time) * 1000.0f;
             meas.pcl_proc_cur->points.push_back(pt);
+            ++current_point_count;
           }
           else
           {
             pt.curvature += (frame_header_time - m.lio_time) * 1000.0f;
             meas.pcl_proc_next->points.push_back(pt);
+            ++next_point_count;
           }
         }
+        addLidarFrameContributions(
+            frame_id,
+            current_point_count,
+            next_point_count,
+            meas.pcl_proc_cur_frame,
+            meas.pcl_proc_next_frame);
         lid_raw_data_buffer.pop_front();
         lid_header_time_buffer.pop_front();
+        lid_frame_id_buffer.pop_front();
       }
 
       meas.measures.push_back(m);
@@ -1276,6 +1305,10 @@ bool LIVMapper::sync_packages(LidarMeasureGroup &meas)
       meas.lidar = lid_raw_data_buffer.front(); // push the first lidar topic
       meas.lidar_frame_beg_time = lid_header_time_buffer.front(); // generate lidar_beg_time
       meas.lidar_frame_end_time  = meas.lidar_frame_beg_time + meas.lidar->points.back().curvature / double(1000); // calc lidar scan end time
+      meas.pcl_proc_cur_frame.reset();
+      meas.pcl_proc_cur_frame.addContribution(
+          lid_frame_id_buffer.front(),
+          meas.lidar->points.size());
       lidar_pushed = true;             
     }
     struct MeasureGroup m; // standard method to keep imu message.
@@ -1283,6 +1316,7 @@ bool LIVMapper::sync_packages(LidarMeasureGroup &meas)
     mtx_buffer.lock();
     lid_raw_data_buffer.pop_front();
     lid_header_time_buffer.pop_front();
+    lid_frame_id_buffer.pop_front();
     mtx_buffer.unlock();
     sig_buffer.notify_all();
     lidar_pushed = false; // sync one whole lidar scan.

@@ -237,6 +237,19 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
 
   ament_add_gtest(
+    test_lidar_frame_provenance
+    test/test_lidar_frame_provenance.cpp
+  )
+
+  if(TARGET test_lidar_frame_provenance)
+    target_include_directories(
+      test_lidar_frame_provenance
+      PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+  endif()
+
+  ament_add_gtest(
     test_lidar_localizability_basis
     test/test_lidar_localizability_basis.cpp
   )
