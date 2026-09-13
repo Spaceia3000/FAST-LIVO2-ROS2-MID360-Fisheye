@@ -4,8 +4,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include <Eigen/Core>
+#include <rclcpp/qos.hpp>
 
 #include "fast_livo/msg/lidar_localizability_calibration.hpp"
 #include "lidar_directional_localizability.h"
@@ -13,6 +15,31 @@
 
 namespace lidar_localizability_calibration_transport
 {
+
+struct Policy
+{
+  bool publish_enabled{false};
+  std::string topic{"/lidar_localizability_calibration"};
+  int qos_depth{0};
+
+  bool active(
+      const LidarLocalizabilityCalibrationPolicy &calibration_policy) const
+  {
+    return
+        calibration_policy.active() &&
+        publish_enabled &&
+        qos_depth > 0 &&
+        !topic.empty();
+  }
+};
+
+inline rclcpp::QoS
+makeQos(const std::size_t depth)
+{
+  return rclcpp::QoS(rclcpp::KeepLast(depth))
+      .reliable()
+      .durability_volatile();
+}
 
 inline std::array<double, 9>
 serializeMatrixRowMajor(const Eigen::Matrix3d &matrix)

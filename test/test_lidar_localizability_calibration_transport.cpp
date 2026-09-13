@@ -18,6 +18,8 @@ using CalibrationMessage =
     fast_livo::msg::LidarLocalizabilityCalibration;
 using lidar_localizability_calibration_transport::
     serializeLidarLocalizabilityCalibration;
+using CalibrationTransportPolicy =
+    lidar_localizability_calibration_transport::Policy;
 
 constexpr double kTolerance = 1e-12;
 constexpr std::uint64_t kInputSamples =
@@ -132,6 +134,113 @@ makeAvailableSummary()
 }
 
 }  // namespace
+
+TEST(
+    LidarLocalizabilityCalibrationTransportPolicy,
+    DefaultIsInactiveAndHasNoInventedDepth)
+{
+  const LidarLocalizabilityCalibrationPolicy calibration_policy;
+  const CalibrationTransportPolicy transport_policy;
+
+  EXPECT_FALSE(transport_policy.active(calibration_policy));
+  EXPECT_FALSE(transport_policy.publish_enabled);
+  EXPECT_EQ(transport_policy.topic, "/lidar_localizability_calibration");
+  EXPECT_EQ(transport_policy.qos_depth, 0);
+}
+
+TEST(
+    LidarLocalizabilityCalibrationTransportPolicy,
+    CalibrationInactiveDisablesOtherwiseValidTransport)
+{
+  LidarLocalizabilityCalibrationPolicy calibration_policy;
+  calibration_policy.enabled = false;
+  calibration_policy.histogram_bins = 8;
+
+  CalibrationTransportPolicy transport_policy;
+  transport_policy.publish_enabled = true;
+  transport_policy.qos_depth = 3;
+
+  EXPECT_FALSE(transport_policy.active(calibration_policy));
+}
+
+TEST(
+    LidarLocalizabilityCalibrationTransportPolicy,
+    PublishDisabledIsInactive)
+{
+  LidarLocalizabilityCalibrationPolicy calibration_policy;
+  calibration_policy.enabled = true;
+  calibration_policy.histogram_bins = 8;
+
+  CalibrationTransportPolicy transport_policy;
+  transport_policy.qos_depth = 3;
+
+  EXPECT_FALSE(transport_policy.active(calibration_policy));
+}
+
+TEST(
+    LidarLocalizabilityCalibrationTransportPolicy,
+    NonPositiveDepthIsInactive)
+{
+  LidarLocalizabilityCalibrationPolicy calibration_policy;
+  calibration_policy.enabled = true;
+  calibration_policy.histogram_bins = 8;
+
+  CalibrationTransportPolicy transport_policy;
+  transport_policy.publish_enabled = true;
+
+  transport_policy.qos_depth = 0;
+  EXPECT_FALSE(transport_policy.active(calibration_policy));
+
+  transport_policy.qos_depth = -1;
+  EXPECT_FALSE(transport_policy.active(calibration_policy));
+}
+
+TEST(
+    LidarLocalizabilityCalibrationTransportPolicy,
+    EmptyTopicIsInactive)
+{
+  LidarLocalizabilityCalibrationPolicy calibration_policy;
+  calibration_policy.enabled = true;
+  calibration_policy.histogram_bins = 8;
+
+  CalibrationTransportPolicy transport_policy;
+  transport_policy.publish_enabled = true;
+  transport_policy.qos_depth = 3;
+  transport_policy.topic.clear();
+
+  EXPECT_FALSE(transport_policy.active(calibration_policy));
+  EXPECT_TRUE(transport_policy.topic.empty());
+}
+
+TEST(
+    LidarLocalizabilityCalibrationTransportPolicy,
+    AllConditionsValidActivatesTransport)
+{
+  LidarLocalizabilityCalibrationPolicy calibration_policy;
+  calibration_policy.enabled = true;
+  calibration_policy.histogram_bins = 8;
+
+  CalibrationTransportPolicy transport_policy;
+  transport_policy.publish_enabled = true;
+  transport_policy.qos_depth = 3;
+
+  EXPECT_TRUE(transport_policy.active(calibration_policy));
+}
+
+TEST(
+    LidarLocalizabilityCalibrationTransportPolicy,
+    QosIsReliableVolatileKeepLastWithRequestedDepth)
+{
+  constexpr std::size_t kRequestedDepth = 7U;
+  const auto qos =
+      lidar_localizability_calibration_transport::makeQos(
+          kRequestedDepth);
+
+  EXPECT_EQ(qos.history(), rclcpp::HistoryPolicy::KeepLast);
+  EXPECT_EQ(qos.depth(), kRequestedDepth);
+  EXPECT_EQ(qos.reliability(), rclcpp::ReliabilityPolicy::Reliable);
+  EXPECT_EQ(qos.durability(), rclcpp::DurabilityPolicy::Volatile);
+}
 
 TEST(
     LidarLocalizabilityCalibrationTransport,

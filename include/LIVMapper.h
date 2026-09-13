@@ -17,6 +17,7 @@ which is included as part of this source code package.
 #include "vio.h"
 #include "preprocess.h"
 #include "fast_livo/msg/lidar_measurement_information.hpp"
+#include "lidar_localizability_calibration_transport.h"
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.hpp>
 #include <tf2_ros/transform_broadcaster.h>
@@ -77,6 +78,8 @@ public:
   string lid_topic, imu_topic, seq_name, img_topic;
   string metric_cloud_topic;
   string lidar_information_topic;
+  lidar_localizability_calibration_transport::Policy
+      lidar_localizability_calibration_transport_policy;
   V3D extT;
   M3D extR;
 
@@ -179,6 +182,8 @@ public:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudFullRes;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudMetric;
   rclcpp::Publisher<fast_livo::msg::LidarMeasurementInformation>::SharedPtr pubLidarMeasurementInformation;
+  rclcpp::Publisher<fast_livo::msg::LidarLocalizabilityCalibration>::SharedPtr
+      pubLidarLocalizabilityCalibration;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pubNormal;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubSubVisualMap;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudEffect;

@@ -354,6 +354,11 @@ if(BUILD_TESTING)
   )
 
   if(TARGET test_lidar_localizability_calibration_transport)
+    ament_target_dependencies(
+      test_lidar_localizability_calibration_transport
+      rclcpp
+    )
+
     target_include_directories(
       test_lidar_localizability_calibration_transport
       PRIVATE

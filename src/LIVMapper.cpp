@@ -131,6 +131,15 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   try_declare.template operator()<std::string>("publish.metric_cloud_topic", "/cloud_registered_metric");
   try_declare.template operator()<bool>("publish.lidar_information_en", false);
   try_declare.template operator()<std::string>("publish.lidar_information_topic", "/lidar_measurement_information");
+  try_declare.template operator()<bool>(
+      "publish.lidar_localizability_calibration_en",
+      false);
+  try_declare.template operator()<std::string>(
+      "publish.lidar_localizability_calibration_topic",
+      "/lidar_localizability_calibration");
+  try_declare.template operator()<int>(
+      "publish.lidar_localizability_calibration_qos_depth",
+      0);
 
   // get parameter
   this->node->get_parameter("common.lid_topic", lid_topic);
@@ -198,6 +207,15 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   this->node->get_parameter("publish.metric_cloud_topic", metric_cloud_topic);
   this->node->get_parameter("publish.lidar_information_en", lidar_information_en);
   this->node->get_parameter("publish.lidar_information_topic", lidar_information_topic);
+  this->node->get_parameter(
+      "publish.lidar_localizability_calibration_en",
+      lidar_localizability_calibration_transport_policy.publish_enabled);
+  this->node->get_parameter(
+      "publish.lidar_localizability_calibration_topic",
+      lidar_localizability_calibration_transport_policy.topic);
+  this->node->get_parameter(
+      "publish.lidar_localizability_calibration_qos_depth",
+      lidar_localizability_calibration_transport_policy.qos_depth);
 }
 
 void LIVMapper::initializeComponents(rclcpp::Node::SharedPtr &node) 
@@ -341,6 +359,24 @@ void LIVMapper::initializeSubscribersAndPublishers(rclcpp::Node::SharedPtr &node
         fast_livo::msg::LidarMeasurementInformation>(
           lidar_information_topic,
           10);
+  }
+  const auto &calibration_policy =
+      voxelmap_manager->config_setting_
+          .lidar_localizability_calibration_policy_;
+  if (
+      lidar_localizability_calibration_transport_policy.active(
+          calibration_policy))
+  {
+    const auto qos =
+        lidar_localizability_calibration_transport::makeQos(
+            static_cast<std::size_t>(
+                lidar_localizability_calibration_transport_policy
+                    .qos_depth));
+    pubLidarLocalizabilityCalibration =
+        this->node->create_publisher<
+            fast_livo::msg::LidarLocalizabilityCalibration>(
+                lidar_localizability_calibration_transport_policy.topic,
+                qos);
   }
   pubNormal = this->node->create_publisher<visualization_msgs::msg::MarkerArray>("/visualization_marker", 100);
   pubSubVisualMap = this->node->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_visual_sub_map_before", 100);
