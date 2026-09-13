@@ -106,6 +106,7 @@ find_package(Boost REQUIRED COMPONENTS thread)
 # Generate FAST-LIVO2 ROS 2 transport interfaces.
 rosidl_generate_interfaces(
   ${PROJECT_NAME}
+  "msg/LidarLocalizabilityCalibration.msg"
   "msg/LidarMeasurementInformation.msg"
   DEPENDENCIES
     std_msgs
@@ -344,6 +345,25 @@ if(BUILD_TESTING)
       PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${EIGEN3_INCLUDE_DIR}
+    )
+  endif()
+
+  ament_add_gtest(
+    test_lidar_localizability_calibration_transport
+    test/test_lidar_localizability_calibration_transport.cpp
+  )
+
+  if(TARGET test_lidar_localizability_calibration_transport)
+    target_include_directories(
+      test_lidar_localizability_calibration_transport
+      PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+
+    target_link_libraries(
+      test_lidar_localizability_calibration_transport
+      "${cpp_typesupport_target}"
     )
   endif()
 endif()
