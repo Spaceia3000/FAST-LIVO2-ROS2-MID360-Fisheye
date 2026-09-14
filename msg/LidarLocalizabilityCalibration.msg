@@ -30,7 +30,7 @@ float64 rotation_contribution_normalization_radius_m
 # 1 m normalization. A_tt = sum n_L n_L^T and is dimensionless after normal
 # normalization. Neither matrix is H^T R^-1 H; never fuse or sum either with
 # ESIKF measurement information.
-# All 3x3 matrices are serialized ROW-MAJOR: array[3*r+c] = M(r,c).
+# All 3x3 matrices are serialized ROW-MAJOR: linear index is 3*r + c and stores M(r,c).
 float64[9] rotation_gram_matrix
 float64[9] translation_gram_matrix
 
