@@ -60,7 +60,14 @@ jobs:
           mkdir -p "$evidence/config" "$evidence/launch" "$evidence/rviz_cfg"
 
           test "$(git -C "$fast" branch --show-current)" = "$TASK_BRANCH"
-          test "$(git -C "$fast" rev-parse HEAD)" = "$FAST_BASE"
+          git -C "$fast" merge-base --is-ancestor "$FAST_BASE" HEAD
+          mapfile -t pre_delta < <(git -C "$fast" diff --name-only "$FAST_BASE"..HEAD | sort -u)
+          for p in "${pre_delta[@]}"; do
+            case "$p" in
+              .github/workflows/s0-b-fast-reconcile.yml|.ai/tasks/HA-S0-B-FAST-RECONCILE-20260925-01.md) ;;
+              *) echo "UNEXPECTED_PRE_CODEX_DELTA=$p"; exit 1 ;;
+            esac
+          done
           test -z "$(git -C "$fast" status --porcelain=v1 --untracked-files=all)"
 
           echo "$(git -C "$LOCAL_FAST" rev-parse HEAD)" > "$RUNNER_TEMP/local_fast_head.before"
@@ -227,11 +234,13 @@ jobs:
 
           /usr/bin/python3 -m py_compile "$fast/launch/mapping_ugv_livo.launch.py"
           /usr/bin/python3 - <<'PY'
+          import os
           import yaml
           from pathlib import Path
+          root = Path(os.environ["GITHUB_WORKSPACE"]) / "s0_fast_checkout"
           for p in (
-              Path("$GITHUB_WORKSPACE/s0_fast_checkout/config/ugv_v1_livo.yaml"),
-              Path("$GITHUB_WORKSPACE/s0_fast_checkout/rviz_cfg/fast_livo2_ugv_livo.rviz"),
+              root / "config/ugv_v1_livo.yaml",
+              root / "rviz_cfg/fast_livo2_ugv_livo.rviz",
           ):
               yaml.safe_load(p.read_text())
               print("PARSE_PASS", p)
