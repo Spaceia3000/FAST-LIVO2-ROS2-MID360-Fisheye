@@ -28,12 +28,12 @@ which is included as part of this source code package.
 class LIVMapper
 {
 public:
-  LIVMapper(rclcpp::Node::SharedPtr &node, std::string node_name, const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
+  LIVMapper(std::string node_name, const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
   ~LIVMapper();
-  void initializeSubscribersAndPublishers(rclcpp::Node::SharedPtr &nh, image_transport::ImageTransport &it_);
+  void initializeSubscribersAndPublishers();
   void initializeComponents(rclcpp::Node::SharedPtr &node);
   void initializeFiles();
-  void run(rclcpp::Node::SharedPtr &node);
+  void run();
   void gravityAlignment();
   void handleFirstFrame();
   void stateEstimationAndMapping();
@@ -199,6 +199,7 @@ public:
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr mavros_pose_publisher;
   rclcpp::TimerBase::SharedPtr imu_prop_timer;
   rclcpp::Node::SharedPtr node;
+  std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
 
   int frame_num = 0;
   double aver_time_consu = 0;

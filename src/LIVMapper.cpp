@@ -15,11 +15,12 @@ which is included as part of this source code package.
 #include <boost/filesystem.hpp>
 
 using namespace Sophus;
-LIVMapper::LIVMapper(rclcpp::Node::SharedPtr &node, std::string node_name, const rclcpp::NodeOptions & options)
+LIVMapper::LIVMapper(std::string node_name, const rclcpp::NodeOptions & options)
     : node(std::make_shared<rclcpp::Node>(node_name, options)),
       extT(0, 0, 0),
       extR(M3D::Identity())
 {
+  tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this->node);
   extrinT.assign(3, 0.0);
   extrinR.assign(9, 0.0);
   cameraextrinT.assign(3, 0.0);
@@ -49,7 +50,19 @@ LIVMapper::LIVMapper(rclcpp::Node::SharedPtr &node, std::string node_name, const
   path.header.frame_id = "camera_init";
 }
 
-LIVMapper::~LIVMapper() {}
+LIVMapper::~LIVMapper()
+{
+  if (imu_prop_timer)
+  {
+    imu_prop_timer->cancel();
+  }
+  imu_prop_timer.reset();
+
+  sub_img_compressed.reset();
+  sub_img.reset();
+  sub_imu.reset();
+  sub_pcl.reset();
+}
 
 void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
 {
@@ -331,7 +344,7 @@ void LIVMapper::initializeFiles()
     fout_out.open(DEBUG_FILE_DIR("mat_out.txt"), std::ios::out);
 }
 
-void LIVMapper::initializeSubscribersAndPublishers(rclcpp::Node::SharedPtr &node, image_transport::ImageTransport &it_)
+void LIVMapper::initializeSubscribersAndPublishers()
 {
   image_transport::ImageTransport it(this->node);
   if (p_pre->lidar_type == AVIA) {
@@ -627,6 +640,10 @@ void LIVMapper::handleLIO()
   
   euler_cur = RotMtoEuler(_state.rot_end);
   geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
+  if (!rclcpp::ok())
+  {
+    return;
+  }
   publish_odometry(pubOdomAftMapped);
   if (pubLidarLocalizabilityCalibration)
   {
@@ -773,7 +790,7 @@ void LIVMapper::savePCD()
   }
 }
 
-void LIVMapper::run(rclcpp::Node::SharedPtr &node) 
+void LIVMapper::run()
 {
   rclcpp::Rate rate(5000);
   while (rclcpp::ok()) 
@@ -1670,13 +1687,16 @@ void LIVMapper::publish_lidar_localizability_calibration(
 
 void LIVMapper::publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr &pubOdomAftMapped)
 {
+  if (!rclcpp::ok() || !pubOdomAftMapped || !tf_broadcaster)
+  {
+    return;
+  }
+
   odomAftMapped.header.frame_id = "camera_init";
   odomAftMapped.child_frame_id = "aft_mapped";
   odomAftMapped.header.stamp = sec2Stamp(LidarMeasures.last_lio_update_time);
   set_posestamp(odomAftMapped.pose.pose);
 
-  static std::shared_ptr<tf2_ros::TransformBroadcaster> br;
-  br = std::make_shared<tf2_ros::TransformBroadcaster>(this->node);
   tf2::Transform transform;
   tf2::Quaternion q;
   transform.setOrigin(tf2::Vector3(_state.pos_end(0), _state.pos_end(1), _state.pos_end(2)));
@@ -1685,7 +1705,7 @@ void LIVMapper::publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry
   q.setY(geoQuat.y);
   q.setZ(geoQuat.z);
   transform.setRotation(q);
-  br->sendTransform(geometry_msgs::msg::TransformStamped(createTransformStamped(transform, odomAftMapped.header.stamp, "camera_init", "aft_mapped")));
+  tf_broadcaster->sendTransform(geometry_msgs::msg::TransformStamped(createTransformStamped(transform, odomAftMapped.header.stamp, "camera_init", "aft_mapped")));
   pubOdomAftMapped->publish(odomAftMapped);
 }
 
