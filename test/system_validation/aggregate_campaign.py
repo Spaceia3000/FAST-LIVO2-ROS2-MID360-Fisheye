@@ -127,6 +127,37 @@ def lidar_period(input_doc: dict[str, Any]) -> float | None:
     return None
 
 
+def required_coverage_roles(variant: str) -> tuple[str, ...]:
+    return {
+        "LO": ("lidar",),
+        "LIO": ("lidar", "imu"),
+        "LIVO": ("lidar", "imu", "image"),
+    }.get(str(variant).upper(), ("lidar",))
+
+
+def effective_input_interval(
+    input_doc: dict[str, Any], variant: str
+) -> tuple[int | None, int | None, tuple[str, ...], list[str]]:
+    roles = required_coverage_roles(variant)
+    by_role = nested(input_doc, "coverage.by_role", {}) or {}
+    intervals: list[tuple[int, int]] = []
+    missing: list[str] = []
+    for role in roles:
+        row = by_role.get(role) or {}
+        first, last = row.get("first_ns"), row.get("last_ns")
+        if not (_finite_number(first) and _finite_number(last)):
+            missing.append(role)
+            continue
+        intervals.append((int(first), int(last)))
+    if missing or len(intervals) != len(roles):
+        return None, None, roles, missing
+    first = max(value[0] for value in intervals)
+    last = min(value[1] for value in intervals)
+    if last < first:
+        return first, last, roles, ["no_common_overlap"]
+    return first, last, roles, []
+
+
 def classify_cell(cell: dict[str, Any], manifest: dict[str, Any] | None,
                   metrics: dict[str, Any] | None, input_doc: dict[str, Any] | None,
                   policy: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -227,11 +258,26 @@ def classify_cell(cell: dict[str, Any], manifest: dict[str, Any] | None,
         temporal_failures.append("odometry timestamps are not strictly monotonic")
     tail_evidence: dict[str, Any] = {}
     period = lidar_period(inp) if input_doc else None
-    input_first = nested(inp, "coverage.by_role.lidar.first_ns") if inp else None
-    input_last = nested(inp, "coverage.by_role.lidar.last_ns") if inp else None
+    variant = str(cell.get("variant", "LO")).upper()
+    input_first, input_last, required_roles, missing_roles = (
+        effective_input_interval(inp, variant) if inp
+        else (None, None, required_coverage_roles(variant), ["input_integrity_absent"])
+    )
     output_first = odom.get("first_stamp_ns")
     output_last = odom.get("last_stamp_ns")
-    if all(_finite_number(v) for v in (period, input_first, input_last, output_first, output_last)):
+    if missing_roles:
+        temporal_failures.append(
+            "required sensor coverage unavailable for "
+            + variant + ": " + ",".join(missing_roles))
+        tail_evidence = {
+            "available": False,
+            "status": "FAIL",
+            "variant": variant,
+            "required_roles": list(required_roles),
+            "missing_roles": missing_roles,
+            "policy": "tail coverage is evaluated on the common interval of sensors required by the mode",
+        }
+    elif all(_finite_number(v) for v in (period, input_first, input_last, output_first, output_last)):
         tolerance = max(3.0 * float(period), float(policy["temporal"]["tail_minimum_tolerance_s"]))
         start_delta = (float(output_first) - float(input_first)) / 1e9
         input_duration = (float(input_last) - float(input_first)) / 1e9
@@ -242,21 +288,38 @@ def classify_cell(cell: dict[str, Any], manifest: dict[str, Any] | None,
             <= float(input_last) + tolerance * 1e9
         )
         deficit = (float(input_last) - float(output_last)) / 1e9 if clocks_comparable else None
-        tail_evidence = {"available": clocks_comparable,
-                         "status": ("FAIL" if clocks_comparable and deficit is not None and deficit > tolerance
-                                    else "PASS" if clocks_comparable else "N/A"),
-                         "input_last_ns": int(input_last),
-                         "output_last_ns": int(output_last), "output_minus_input_start_s": start_delta,
-                         "input_duration_s": input_duration, "output_duration_s": output_duration,
-                         "deficit_s": deficit, "median_lidar_period_s": period,
-                         "tolerance_s": tolerance,
-                         "policy": "max(3*median_lidar_period, tail_minimum_tolerance_s)",
-                         "note": None if clocks_comparable else "N/A: input/output stamp domains are not comparable"}
+        tail_evidence = {
+            "available": clocks_comparable,
+            "status": ("FAIL" if clocks_comparable and deficit is not None and deficit > tolerance
+                       else "PASS" if clocks_comparable else "N/A"),
+            "variant": variant,
+            "required_roles": list(required_roles),
+            "input_first_ns": int(input_first),
+            "input_last_ns": int(input_last),
+            "lidar_last_ns": nested(inp, "coverage.by_role.lidar.last_ns"),
+            "output_last_ns": int(output_last),
+            "output_minus_input_start_s": start_delta,
+            "input_duration_s": input_duration,
+            "output_duration_s": output_duration,
+            "deficit_s": deficit,
+            "median_lidar_period_s": period,
+            "tolerance_s": tolerance,
+            "policy": (
+                "max(3*median_lidar_period, tail_minimum_tolerance_s) "
+                "over the common interval of sensors required by the mode"
+            ),
+            "note": None if clocks_comparable else "N/A: input/output stamp domains are not comparable",
+        }
         if clocks_comparable and deficit is not None and deficit > tolerance:
             temporal_failures.append("output tail coverage deficit exceeds data-driven tolerance")
     else:
-        tail_evidence = {"available": False, "status": "N/A",
-                         "reason": "endpoint stamps or median LiDAR period unavailable"}
+        tail_evidence = {
+            "available": False,
+            "status": "N/A",
+            "variant": variant,
+            "required_roles": list(required_roles),
+            "reason": "endpoint stamps or median LiDAR period unavailable",
+        }
     temporal = result("FAIL", temporal_failures, {"tail_coverage": tail_evidence}) if temporal_failures else result("PASS", ["strict timestamps; tail coverage passes or is unavailable"], {"tail_coverage": tail_evidence})
 
     shutdown_status = str(m.get("cell_status", runner_status))
