@@ -430,7 +430,14 @@ def sample_metrics(role: str, rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
         result["structural_violations"] = {
             "point_count_mismatch": sum(not row.get("point_count_consistent", True) for row in rows),
             "sample_with_nonfinite_xyz": sum(row.get("xyz_nonfinite_count", 0) > 0 for row in rows),
-            "sample_with_offset_regression": sum(row.get("offset_time_regression_count", 0) > 0 for row in rows),
+        }
+        # Livox CustomPoint.offset_time is defined relative to the frame timebase,
+        # but the driver/specification does not require points[] to be globally
+        # sorted by offset_time. Keep regressions observable without declaring
+        # the sensor data structurally invalid.
+        result["diagnostics"] = {
+            "sample_with_offset_regression": sum(
+                row.get("offset_time_regression_count", 0) > 0 for row in rows),
         }
     elif role == "imu":
         result["structural_violations"] = {
