@@ -1,0 +1,5 @@
+stamp_ns,x,y,z,qx,qy,qz,qw,finite,frame_id,child_frame_id
+1000000000,0,0,0,0,0,0,1,true,camera_init,body
+2000000000,1,0,0,0,0,0,1,true,camera_init,body
+3000000000,1,1,0,0,0,0,1,true,camera_init,body
+4000000000,0,0,0,0,0,0,1,true,camera_init,body

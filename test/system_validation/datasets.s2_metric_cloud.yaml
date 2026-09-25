@@ -1,0 +1,69 @@
+schema_version: 1
+schedule_seed: 20260918
+
+# The official root intentionally spans original and sensor-time corrected bags.
+data_roots:
+  official: ${FAST_LIVO2_CONVERTED_DATA_ROOT}
+  ugv: ${FAST_LIVO2_UGV_DATA_ROOT}
+
+datasets:
+  - &official_metric
+    id: CBD_Building_03
+    enabled: true
+    purpose: validation
+    data_role: benchmark
+    data_root: official
+    bag_relative_path: original/CBD_Building_03
+    sensor_topics:
+      lidar: /livox/lidar
+      imu: /livox/imu
+      image: /left_camera/image
+    launch:
+      launch_file: mapping_aviz.launch.py
+      base_params: config/avia.yaml
+      camera_params: config/camera_pinhole.yaml
+      profile_provenance: "FAST-LIVO2 repository profiles, hashed per run."
+      extra_args: [use_rviz:=False, use_respawn:=False, use_sim_time:=True]
+    variants: [LO, LIO, LIVO]
+    repetitions: 1
+    playback_rate: 1.0
+    record:
+      cloud_registered: false
+      metric_cloud: true
+    notes: "S2-ready capture: exact-stamp metric cloud, not legacy node-clock cloud."
+
+  - <<: *official_metric
+    id: Retail_Street_sensor_time
+    data_role: stress_test
+    bag_relative_path: sensor_time/Retail_Street
+    playback_rate: 0.5
+    notes: "Sensor-time corrected Retail_Street; source bag remains immutable."
+
+  - id: ugv_custom_fastlivo2_10
+    enabled: true
+    purpose: validation
+    data_role: evaluation
+    data_root: ugv
+    bag_relative_path: ugv_custom_fastlivo2_10
+    sensor_topics:
+      lidar: /livox/lidar
+      imu: /livox/imu
+      image: /camera/camera/color/image_raw
+    launch:
+      launch_file: mapping_aviz.launch.py
+      variant_params:
+        LO: test/system_validation/profiles/ugv/fast_livo2_ugv_v1_lo.yaml
+        LIO: test/system_validation/profiles/ugv/fast_livo2_ugv_v1_lio.yaml
+        LIVO: test/system_validation/profiles/ugv/fast_livo2_ugv_v1_livo.yaml
+      camera_params: null
+      profile_provenance: "Byte-exact FAST-LIVO2 UGV profiles vendored for validation."
+      profile_provenance_file: test/system_validation/profiles/ugv/provenance.yaml
+      extra_args: [use_rviz:=False, use_respawn:=False, use_sim_time:=True]
+    variants: [LO, LIO, LIVO]
+    repetitions: 1
+    playback_rate: 1.0
+    playback_qos_overrides: ${FAST_LIVO2_UGV_DATA_ROOT}/qos/fastlivo2_playback_qos.yaml
+    record:
+      cloud_registered: false
+      metric_cloud: true
+    notes: "Non-calibration campus UGV sequence; original bag remains immutable."

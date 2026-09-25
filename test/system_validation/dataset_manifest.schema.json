@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fast-livo2.local/system-validation/dataset-manifest.schema.json",
+  "title": "FAST-LIVO2 system-validation dataset manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schedule_seed", "data_roots", "datasets"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "schedule_seed": {"type": "integer", "minimum": 0},
+    "data_roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["official", "ugv"],
+      "properties": {
+        "official": {"type": "string", "minLength": 1},
+        "ugv": {"type": "string", "minLength": 1}
+      }
+    },
+    "datasets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/dataset"}
+    }
+  },
+  "$defs": {
+    "topic": {"type": "string", "pattern": "^/"},
+    "profileMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "LO": {"type": "string", "minLength": 1},
+        "LIO": {"type": "string", "minLength": 1},
+        "LIVO": {"type": "string", "minLength": 1}
+      },
+      "minProperties": 1
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "purpose", "data_role", "data_root", "bag_relative_path",
+        "sensor_topics", "launch", "variants", "repetitions"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+        "enabled": {"type": "boolean", "default": true},
+        "purpose": {"const": "validation"},
+        "data_role": {
+          "enum": ["benchmark", "evaluation", "stress_test"]
+        },
+        "data_root": {"enum": ["official", "ugv"]},
+        "bag_relative_path": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "(?i)(^|[/_.-])(calib(ration)?|calibracion|intrinsic|extrinsic)($|[/_.-])"
+          },
+          "description": "Relative path inside its declared immutable data root."
+        },
+        "sensor_topics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lidar"],
+          "properties": {
+            "lidar": {"$ref": "#/$defs/topic"},
+            "imu": {"$ref": "#/$defs/topic"},
+            "image": {"$ref": "#/$defs/topic"}
+          }
+        },
+        "launch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["launch_file"],
+          "properties": {
+            "launch_file": {"type": "string"},
+            "base_params": {"type": "string", "minLength": 1},
+            "variant_params": {"$ref": "#/$defs/profileMap"},
+            "camera_params": {"type": ["string", "null"]},
+            "profile_provenance": {"type": "string", "minLength": 1},
+            "profile_provenance_file": {"type": "string", "minLength": 1},
+            "extra_args": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": []
+            }
+          },
+          "oneOf": [
+            {"required": ["base_params"], "not": {"required": ["variant_params"]}},
+            {"required": ["variant_params"], "not": {"required": ["base_params"]}}
+          ]
+        },
+        "variants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["LO", "LIO", "LIVO"]}
+        },
+        "repetitions": {"type": "integer", "minimum": 1},
+        "playback_rate": {"type": "number", "exclusiveMinimum": 0, "default": 1.0},
+        "playback_qos_overrides": {"type": "string", "minLength": 1},
+        "record": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cloud_registered": {"type": "boolean", "default": false},
+            "metric_cloud": {"type": "boolean", "default": false}
+          }
+        },
+        "ground_truth": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["topic"],
+          "properties": {
+            "topic": {"$ref": "#/$defs/topic"},
+            "max_time_delta_s": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 0.05
+            }
+          }
+        },
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+stamp_ns,x,y,z,qx,qy,qz,qw,finite,frame_id,child_frame_id
+4000000000,10,5,0,0,0,0,1,true,map,body
+2000000000,11,5,0,0,0,0,1,true,map,body
+1000000000,10,5,0,0,0,0,1,true,map,body
+3000000000,11,6,0,0,0,0,1,true,map,body
