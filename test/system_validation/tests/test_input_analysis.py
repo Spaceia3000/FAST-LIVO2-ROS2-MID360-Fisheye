@@ -8,7 +8,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from analyze_input import (image_sample, one_to_one_nearest, robust_summary,
-                           synchronization_metrics, timing_metrics, topic_metrics)
+                           sample_metrics, synchronization_metrics, timing_metrics,
+                           topic_metrics)
 
 
 def _rows(stamps):
@@ -57,6 +58,23 @@ def test_input_sync_reports_offset_and_drift_without_pass_fail():
     assert math.isclose(result["linear_drift_s_per_s"], 0.01)
     assert len(pairs) == 3
 
+
+
+def test_livox_offset_regression_is_descriptive_not_structural():
+    rows = [{
+        "point_count_consistent": True,
+        "xyz_nonfinite_count": 0,
+        "offset_time_regression_count": 7,
+        "offset_time_min": 0,
+        "offset_time_max": 100_000_000,
+    }]
+    result = sample_metrics("lidar", rows)
+    assert result["structural_violations"] == {
+        "point_count_mismatch": 0,
+        "sample_with_nonfinite_xyz": 0,
+    }
+    assert result["diagnostics"]["sample_with_offset_regression"] == 1
+    assert result["observed"]["offset_time_regression_count"]["max"] == 7.0
 
 def test_input_raw_image_structural_and_photometric_metrics():
     data = bytes([0, 10, 20, 30, 40, 255, 60, 70, 80])
