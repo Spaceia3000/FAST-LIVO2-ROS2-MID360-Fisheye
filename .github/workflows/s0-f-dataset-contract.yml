@@ -1,0 +1,85 @@
+name: S0-F Dataset Contract
+
+on:
+  push:
+    branches:
+      - feat/s0-f-dataset-sync-contract-20260926-01
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s0-f-dataset-contract
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: [self-hosted, Linux, X64, ha-mslam, ros2-humble, codex, legion]
+    timeout-minutes: 5
+    env:
+      CODEX_HOME: /home/breidy/Documents/codex_cli/home
+      BASE_SHA: be1ef1da525cc27a42c13330b57fbf1081721f4c
+    steps:
+      - name: Checkout FAST contract branch
+        uses: actions/checkout@v6
+        with:
+          repository: Spaceia3000/FAST-LIVO2-ROS2-MID360-Fisheye
+          ref: feat/s0-f-dataset-sync-contract-20260926-01
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "$BASE_SHA"..HEAD
+          changed="$(git diff --name-only "$BASE_SHA"..HEAD)"
+          echo "$changed"
+          while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            case "$f" in
+              test/system_validation/analyze_input.py|              test/system_validation/aggregate_campaign.py|              test/system_validation/datasets.s2_metric_cloud.yaml|              test/system_validation/tests/test_input_analysis.py|              test/system_validation/tests/test_aggregate_campaign.py|              .github/workflows/s0-f-dataset-contract.yml) ;;
+              *) echo "OUT_OF_SCOPE=$f"; exit 1 ;;
+            esac
+          done <<< "$changed"
+          echo "S0F_DATASET_CONTRACT_SCOPE=PASS"
+
+      - name: Directed unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONDONTWRITEBYTECODE=1
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 /usr/bin/python3 -m pytest -q -p no:cacheprovider             test/system_validation/tests/test_input_analysis.py             test/system_validation/tests/test_aggregate_campaign.py
+          echo "S0F_DATASET_CONTRACT_TESTS=PASS"
+
+      - name: Codex ASTRA medium review
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cat <<'EOF'
+          Review the FAST-LIVO2 validation-only diff BASE_SHA..HEAD.
+          User constraints:
+          - Do not change FAST-LIVO2 core algorithms, thresholds, calibration, datasets, or sensor payloads.
+          - CBD03 now has a physically generated sensor-time bag at
+            /home/breidy/Documents/datasets/fast_livo2/converted/sensor_time/CBD_Building_03.
+          - UGV10 is already in one sensor header timebase; its camera ends about 39.7 s before LiDAR/IMU.
+          - LO temporal coverage must use LiDAR.
+          - LIO must use the common LiDAR+IMU interval.
+          - LIVO must use the common LiDAR+IMU+camera interval.
+          - Livox CustomPoint.offset_time is relative to the frame base time; global points[] ordering by offset_time is not an official structural invariant.
+          - Dataset validation runs must remain short; no blind tuning.
+          Independently inspect the diff, test logic, and fail-closed behavior.
+          Report exactly:
+          SCOPE
+          LIV0X_OFFSET_CONTRACT
+          MODE_COVERAGE_CONTRACT
+          TEST_ADEQUACY
+          RISKS
+          FINAL
+          End with S0F_DATASET_CONTRACT_PASS or S0F_DATASET_CONTRACT_FAIL.
+          EOF
+          } | sed "s/BASE_SHA/$BASE_SHA/g" | codex exec             -m gpt-6-astra             -c 'model_reasoning_effort="medium"'             --sandbox read-only             -C "$GITHUB_WORKSPACE"             --output-last-message "$RUNNER_TEMP/s0f_dataset_contract_codex.txt" -
+          cat "$RUNNER_TEMP/s0f_dataset_contract_codex.txt"
+          grep -q 'S0F_DATASET_CONTRACT_PASS' "$RUNNER_TEMP/s0f_dataset_contract_codex.txt"
