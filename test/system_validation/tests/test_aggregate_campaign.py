@@ -47,9 +47,10 @@ def valid_metrics(gt=False):
         "ground_truth": {"available": gt, "ate_translation_rmse_m": 0.2 if gt else None}}
 
 
-def classify(inp=None, manifest=None, metrics=None, status="VALID"):
-    return campaign.classify_cell({"status": status}, manifest or valid_manifest(),
-        metrics or valid_metrics(), inp or valid_input(), POLICY)
+def classify(inp=None, manifest=None, metrics=None, status="VALID", variant="LO"):
+    return campaign.classify_cell({"status": status, "variant": variant},
+        manifest or valid_manifest(), metrics or valid_metrics(),
+        inp or valid_input(), POLICY)
 
 
 def test_valid_no_gt_is_structural_pass_but_accuracy_not_established():
@@ -111,6 +112,37 @@ def test_tail_coverage_uses_data_driven_tolerance():
     tail = axes["TEMPORAL"]["evidence"]["tail_coverage"]
     assert tail["tolerance_s"] == pytest.approx(1.0)
     assert tail["status"] == "FAIL"
+    assert axes["TEMPORAL"]["status"] == "FAIL"
+
+
+def test_livo_tail_uses_common_sensor_overlap_not_lidar_tail():
+    inp = valid_input()
+    inp["coverage"]["by_role"].update({
+        "imu": {"first_ns": 100_000_000, "last_ns": 10_100_000_000,
+                "duration_s": 10.0},
+        "image": {"first_ns": 200_000_000, "last_ns": 6_000_000_000,
+                  "duration_s": 5.8},
+    })
+    metrics = valid_metrics()
+    metrics["odometry"]["first_stamp_ns"] = 200_000_000
+    metrics["odometry"]["last_stamp_ns"] = 6_000_000_000
+    axes = classify(inp=inp, metrics=metrics, variant="LIVO")
+    tail = axes["TEMPORAL"]["evidence"]["tail_coverage"]
+    assert tail["status"] == "PASS"
+    assert tail["required_roles"] == ["lidar", "imu", "image"]
+    assert tail["input_first_ns"] == 200_000_000
+    assert tail["input_last_ns"] == 6_000_000_000
+    assert tail["lidar_last_ns"] == 10_000_000_000
+    assert axes["TEMPORAL"]["status"] == "PASS"
+
+
+def test_lo_tail_still_requires_lidar_tail():
+    metrics = valid_metrics()
+    metrics["odometry"]["last_stamp_ns"] = 6_000_000_000
+    axes = classify(metrics=metrics, variant="LO")
+    tail = axes["TEMPORAL"]["evidence"]["tail_coverage"]
+    assert tail["status"] == "FAIL"
+    assert tail["required_roles"] == ["lidar"]
     assert axes["TEMPORAL"]["status"] == "FAIL"
 
 
