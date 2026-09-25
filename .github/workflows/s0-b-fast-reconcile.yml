@@ -1,0 +1,287 @@
+name: S0-B FAST Reconciliation
+
+on:
+  push:
+    branches:
+      - feat/s0-fast-reconcile-20260925-01
+    paths:
+      - .ai/tasks/HA-S0-B-FAST-RECONCILE-20260925-01.md
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: s0-b-fast-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: [self-hosted, Linux, X64, ha-mslam, ros2-humble, codex, legion]
+    timeout-minutes: 180
+    env:
+      CODEX_HOME: /home/breidy/Documents/codex_cli/home
+      LOCAL_FAST: /home/breidy/Documents/fast_livo2_baseline_ws/src/FAST-LIVO2-ROS2-MID360-Fisheye
+      FAST_BASE: a1f1a0b19fd8bd8df7c0a67badca45a0097433e0
+      RVIZ_SHA: 096ba281a2dd18ddeff0276011c0e7f7e6035d2c
+      METRIC_VALIDATION_SHA: 17144a6614718369a38fca65fdb4f9e7fa84c9f8
+      TASK_BRANCH: feat/s0-fast-reconcile-20260925-01
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Checkout isolated FAST task branch
+        uses: actions/checkout@v6
+        with:
+          repository: Spaceia3000/FAST-LIVO2-ROS2-MID360-Fisheye
+          ref: feat/s0-fast-reconcile-20260925-01
+          path: s0_fast_checkout
+          fetch-depth: 0
+          persist-credentials: true
+          clean: true
+
+      - name: Checkout canonical HA reference read-only
+        uses: actions/checkout@v6
+        with:
+          repository: Spaceia3000/ham_slam
+          ref: integration/v1-humble
+          path: s0_ha_reference
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Freeze local source evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          fast="$GITHUB_WORKSPACE/s0_fast_checkout"
+          evidence="$RUNNER_TEMP/s0_fast_evidence"
+          source_clone="$RUNNER_TEMP/s0_fast_source_clone"
+          rm -rf "$evidence" "$source_clone"
+          mkdir -p "$evidence/config" "$evidence/launch" "$evidence/rviz_cfg"
+
+          test "$(git -C "$fast" branch --show-current)" = "$TASK_BRANCH"
+          test "$(git -C "$fast" rev-parse HEAD)" = "$FAST_BASE"
+          test -z "$(git -C "$fast" status --porcelain=v1 --untracked-files=all)"
+
+          echo "$(git -C "$LOCAL_FAST" rev-parse HEAD)" > "$RUNNER_TEMP/local_fast_head.before"
+          git -C "$LOCAL_FAST" status --porcelain=v1 --untracked-files=all > "$RUNNER_TEMP/local_fast_status.before"
+
+          git clone --no-hardlinks "$LOCAL_FAST" "$source_clone"
+          git -C "$source_clone" remote add github https://github.com/Spaceia3000/FAST-LIVO2-ROS2-MID360-Fisheye.git
+          git -C "$source_clone" fetch --no-tags github integration/v1-humble
+
+          test "$(git -C "$source_clone" rev-parse origin/feat/ugv-livo-rviz)" = "$RVIZ_SHA"
+          git -C "$source_clone" format-patch --stdout "$FAST_BASE"..origin/feat/ugv-livo-rviz > "$evidence/rviz_branch_commits.patch" || true
+          git -C "$source_clone" diff --binary "$FAST_BASE" origin/feat/ugv-livo-rviz > "$evidence/rviz_branch_tree.patch"
+
+          if git -C "$source_clone" rev-parse --verify origin/fix/system-validation-metric-cloud-contract >/dev/null 2>&1; then
+            test "$(git -C "$source_clone" rev-parse origin/fix/system-validation-metric-cloud-contract)" = "$METRIC_VALIDATION_SHA"
+            git -C "$source_clone" diff --binary "$FAST_BASE" origin/fix/system-validation-metric-cloud-contract -- test/system_validation > "$evidence/metric_validation.patch"
+          else
+            echo "METRIC_VALIDATION_BRANCH_NOT_PRESENT" > "$evidence/metric_validation.patch"
+          fi
+
+          git -C "$LOCAL_FAST" diff --binary --             test/system_validation/dataset_manifest.schema.json             test/system_validation/run_validation.py             test/system_validation/tests/test_runner_contract.py             > "$evidence/current_dirty_validation.patch"
+
+          for p in config/ugv_v1_livo.yaml launch/mapping_ugv_livo.launch.py rviz_cfg/fast_livo2_ugv_livo.rviz; do
+            test -f "$LOCAL_FAST/$p"
+            mkdir -p "$evidence/$(dirname "$p")"
+            cp -- "$LOCAL_FAST/$p" "$evidence/$p"
+          done
+
+          sha256sum             "$evidence/config/ugv_v1_livo.yaml"             "$evidence/launch/mapping_ugv_livo.launch.py"             "$evidence/rviz_cfg/fast_livo2_ugv_livo.rviz"             | tee "$evidence/ugv_sha256.txt"
+
+          grep -q '^204e244e9776388e03b07219f2dcf2fe4da394f419c77a93fcb94c2cf7bdbb10 ' "$evidence/ugv_sha256.txt"
+          grep -q '^cdfbd3f5e047e1c1e3d8701214b336b1f4b963787f9a6ce2cca5b7abe778d63e ' "$evidence/ugv_sha256.txt"
+          grep -q '^c6cc3c04e83ac50699c97272ce49b4ff392df413a23db7beb2a250f7a555ff9f ' "$evidence/ugv_sha256.txt"
+
+          {
+            echo "=== LOCAL BRANCHES ==="
+            git -C "$LOCAL_FAST" branch -vv
+            echo "=== RVIZ HISTORY ==="
+            git -C "$source_clone" log --oneline --decorate "$FAST_BASE"..origin/feat/ugv-livo-rviz
+            echo "=== DIRECT DIFF ==="
+            git -C "$source_clone" diff --name-status "$FAST_BASE" origin/feat/ugv-livo-rviz
+            echo "=== METRIC VALIDATION ==="
+            git -C "$source_clone" show -s --oneline origin/fix/system-validation-metric-cloud-contract 2>/dev/null || true
+          } > "$evidence/provenance.txt"
+
+          sha256sum "$evidence"/*.patch "$evidence"/ugv_sha256.txt "$evidence"/provenance.txt > "$RUNNER_TEMP/evidence_hashes.before"
+          chmod -R a-w "$evidence" "$source_clone"
+          echo "S0_FAST_EVIDENCE=PASS"
+
+      - name: Run Codex implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          fast="$GITHUB_WORKSPACE/s0_fast_checkout"
+          evidence="$RUNNER_TEMP/s0_fast_evidence"
+          source_clone="$RUNNER_TEMP/s0_fast_source_clone"
+          task="$fast/.ai/tasks/HA-S0-B-FAST-RECONCILE-20260925-01.md"
+
+          {
+            cat "$task"
+            cat <<EOF
+
+          READ-ONLY forensic inputs:
+          $evidence
+          $source_clone
+          $GITHUB_WORKSPACE/s0_ha_reference
+
+          Implement only in:
+          $fast
+
+          Inspect every affected function before editing. Reconcile behavior; do not mechanically apply whole patches.
+
+          Critical rules:
+          - Preserve canonical a1f1a0b CMake architecture flags. Do not port f429324 build-flag drift.
+          - Preserve FAST estimator mathematics and calibration.
+          - Lifecycle fixes from 096ba281 may be ported only as one coherent ownership/shutdown repair.
+          - Scientific validation harness commits 077e48c, c32be22, 0094a9c may be ported if compatible.
+          - Inspect metric_validation.patch. Port only validation-only contract improvements; no estimator behavior changes.
+          - Copy the three UGV files byte-for-byte from evidence unless a build/install defect requires a minimal change; any such change must be reported and justified.
+          - Do not use lsi-uc3m.
+          - Do not commit, push, merge, rebase, change branches/remotes/config/hooks.
+
+          End with:
+          ROOT_CAUSE
+          PORTED_COMMITS_OR_BEHAVIOR
+          REJECTED_DELTAS
+          CHANGED_FILES
+          TESTS_RUN
+          PASS_FAIL
+          REMAINING_RISKS
+          EOF
+          } | codex exec               -m gpt-6-astra               -c 'model_reasoning_effort="medium"'               --sandbox workspace-write               -C "$fast"               --add-dir "$evidence"               --add-dir "$source_clone"               --add-dir "$GITHUB_WORKSPACE/s0_ha_reference"               --output-last-message "$RUNNER_TEMP/s0-fast-codex.txt"               -
+
+          echo "===== CODEX FAST S0-B REPORT ====="
+          cat "$RUNNER_TEMP/s0-fast-codex.txt"
+
+          chmod -R u+w "$evidence" "$source_clone"
+
+      - name: Enforce FAST scope and source invariance
+        shell: bash
+        run: |
+          set -euo pipefail
+          fast="$GITHUB_WORKSPACE/s0_fast_checkout"
+          mapfile -t changed < <(
+            {
+              git -C "$fast" diff --name-only
+              git -C "$fast" ls-files --others --exclude-standard
+            } | sed '/^$/d' | sort -u
+          )
+          printf 'changed=%s\n' "${changed[*]:-}"
+          test "${#changed[@]}" -gt 0
+
+          for p in "${changed[@]}"; do
+            case "$p" in
+              include/LIVMapper.h|src/LIVMapper.cpp|src/main.cpp|test/system_validation/*|test/system_validation/**/*|config/ugv_v1_livo.yaml|launch/mapping_ugv_livo.launch.py|rviz_cfg/fast_livo2_ugv_livo.rviz|.ai/tasks/HA-S0-B-FAST-RECONCILE-20260925-01.md|.github/workflows/s0-b-fast-reconcile.yml)
+                ;;
+              *)
+                echo "OUT_OF_SCOPE=$p"
+                exit 1
+                ;;
+            esac
+          done
+
+          git -C "$fast" diff --check
+          test "$(git -C "$LOCAL_FAST" rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/local_fast_head.before")"
+          git -C "$LOCAL_FAST" status --porcelain=v1 --untracked-files=all > "$RUNNER_TEMP/local_fast_status.after"
+          diff -u "$RUNNER_TEMP/local_fast_status.before" "$RUNNER_TEMP/local_fast_status.after"
+          echo "LOCAL_FAST_UNCHANGED=PASS"
+
+      - name: Verify frozen UGV asset bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          fast="$GITHUB_WORKSPACE/s0_fast_checkout"
+          test "$(sha256sum "$fast/config/ugv_v1_livo.yaml" | awk '{print $1}')" = "204e244e9776388e03b07219f2dcf2fe4da394f419c77a93fcb94c2cf7bdbb10"
+          test "$(sha256sum "$fast/launch/mapping_ugv_livo.launch.py" | awk '{print $1}')" = "cdfbd3f5e047e1c1e3d8701214b336b1f4b963787f9a6ce2cca5b7abe778d63e"
+          test "$(sha256sum "$fast/rviz_cfg/fast_livo2_ugv_livo.rviz" | awk '{print $1}')" = "c6cc3c04e83ac50699c97272ce49b4ff392df413a23db7beb2a250f7a555ff9f"
+          echo "UGV_ASSET_HASHES=PASS"
+
+      - name: Independent build and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          fast="$GITHUB_WORKSPACE/s0_fast_checkout"
+          root="$RUNNER_TEMP/s0_fast_build"
+          rm -rf "$root"
+          mkdir -p "$root"
+          cd "$root"
+
+          source /opt/ros/humble/setup.bash
+          source /home/breidy/Documents/sensors_ws/install/setup.bash
+          source /home/breidy/Documents/fast_livo2_baseline_ws/install/setup.bash
+          export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+          export PYTHONDONTWRITEBYTECODE=1
+
+          colcon build             --symlink-install             --base-paths "$fast"             --packages-select fast_livo             --allow-overriding fast_livo             --cmake-args -DBUILD_TESTING=ON
+
+          source "$root/install/setup.bash"
+
+          colcon test --packages-select fast_livo --event-handlers console_cohesion+
+          colcon test-result --verbose
+
+          /usr/bin/python3 -m pytest -q "$fast/test/system_validation/tests"
+
+          /usr/bin/python3 -m py_compile "$fast/launch/mapping_ugv_livo.launch.py"
+          /usr/bin/python3 - <<'PY'
+          import yaml
+          from pathlib import Path
+          for p in (
+              Path("$GITHUB_WORKSPACE/s0_fast_checkout/config/ugv_v1_livo.yaml"),
+              Path("$GITHUB_WORKSPACE/s0_fast_checkout/rviz_cfg/fast_livo2_ugv_livo.rviz"),
+          ):
+              yaml.safe_load(p.read_text())
+              print("PARSE_PASS", p)
+          PY
+
+          ros2 launch fast_livo mapping_ugv_livo.launch.py --show-args >/tmp/s0_fast_launch_args.txt
+          grep -q 'use_sim_time' /tmp/s0_fast_launch_args.txt
+          grep -q 'use_rviz' /tmp/s0_fast_launch_args.txt
+
+          grep -q 'Value: /path' "$fast/rviz_cfg/fast_livo2_ugv_livo.rviz"
+          grep -q 'Buffer Length: 1000' "$fast/rviz_cfg/fast_livo2_ugv_livo.rviz"
+          grep -q 'Fixed Frame: camera_init' "$fast/rviz_cfg/fast_livo2_ugv_livo.rviz"
+          grep -q 'Value: /cloud_registered' "$fast/rviz_cfg/fast_livo2_ugv_livo.rviz"
+          grep -q 'Value: /rgb_img' "$fast/rviz_cfg/fast_livo2_ugv_livo.rviz"
+
+          git -C "$fast" diff --check
+
+      - name: Commit validated FAST reconciliation
+        shell: bash
+        env:
+          GIT_AUTHOR_NAME: HA-MSLAM Bridge
+          GIT_AUTHOR_EMAIL: bridge@users.noreply.github.com
+          GIT_COMMITTER_NAME: HA-MSLAM Bridge
+          GIT_COMMITTER_EMAIL: bridge@users.noreply.github.com
+        run: |
+          set -euo pipefail
+          fast="$GITHUB_WORKSPACE/s0_fast_checkout"
+          git -C "$fast" add -A
+          git -C "$fast" diff --cached --check
+          git -C "$fast" commit -m "feat(s0): reconcile validated UGV FAST frontend"
+          git -C "$fast" rev-parse HEAD > "$RUNNER_TEMP/fast_s0_commit"
+          test -z "$(git -C "$fast" status --porcelain=v1 --untracked-files=all)"
+
+      - name: Push isolated FAST branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          fast="$GITHUB_WORKSPACE/s0_fast_checkout"
+          git -C "$fast" push origin HEAD:"$TASK_BRANCH"
+          remote="$(git -C "$fast" ls-remote origin "refs/heads/$TASK_BRANCH" | awk '{print $1}')"
+          test "$remote" = "$(cat "$RUNNER_TEMP/fast_s0_commit")"
+          echo "FAST_S0_BRANCH=$TASK_BRANCH"
+          echo "FAST_S0_SHA=$remote"
+
+      - name: Prove canonical base unchanged
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          fast="$GITHUB_WORKSPACE/s0_fast_checkout"
+          base="$(git -C "$fast" ls-remote origin refs/heads/integration/v1-humble | awk '{print $1}')"
+          test "$base" = "$FAST_BASE"
+          echo "FAST_CANONICAL_BASE_UNCHANGED=PASS"
