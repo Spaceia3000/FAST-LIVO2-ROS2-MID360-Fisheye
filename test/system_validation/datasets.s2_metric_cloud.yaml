@@ -13,7 +13,7 @@ datasets:
     purpose: validation
     data_role: benchmark
     data_root: official
-    bag_relative_path: original/CBD_Building_03
+    bag_relative_path: sensor_time/CBD_Building_03
     sensor_topics:
       lidar: /livox/lidar
       imu: /livox/imu
@@ -30,7 +30,7 @@ datasets:
     record:
       cloud_registered: false
       metric_cloud: true
-    notes: "S2-ready capture: exact-stamp metric cloud, not legacy node-clock cloud."
+    notes: "Sensor-time corrected CBD_Building_03; serialized payloads preserved and source bag immutable."
 
   - <<: *official_metric
     id: Retail_Street_sensor_time
