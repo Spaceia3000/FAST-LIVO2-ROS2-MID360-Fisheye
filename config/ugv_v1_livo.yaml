@@ -1,0 +1,130 @@
+/**:
+  ros__parameters:
+    camera:
+      cx: 329.32513427734375
+      cy: 243.7319793701172
+      d0: 0.0
+      d1: 0.0
+      d2: 0.0
+      d3: 0.0
+      d4: 0.0
+      fx: 607.8380737304688
+      fy: 607.2523193359375
+      height: 480
+      model: Pinhole
+      scale: 1.0
+      width: 640
+    common:
+      img_en: 1
+      img_topic: /camera/camera/color/image_raw
+      imu_topic: /livox/imu
+      lid_topic: /livox/lidar
+      lidar_en: 1
+      ros_driver_bug_fix: false
+    evo:
+      pose_output_en: false
+      seq_name: ugv_v1
+    extrin_calib:
+      Pcl:
+      - 0.051160572422022266
+      - -0.10015307608455289
+      - -0.025736155048636886
+      Rcl:
+      - -0.012648705165646978
+      - -0.9998963733180353
+      - 0.006874073251966595
+      - -0.025684498783597853
+      - -0.006547460933093774
+      - -0.999648656917802
+      - 0.9995900743704234
+      - -0.012820818256666477
+      - -0.0255990202812848
+      extrinsic_R:
+      - 0.999910200
+      - -0.010329711
+      - 0.008537470
+      - 0.010513572
+      - 0.999707527
+      - -0.021779027
+      - -0.008310002
+      - 0.021866831
+      - 0.999726355
+      extrinsic_T:
+      - -0.007329500
+      - -0.022027500
+      - 0.046131000
+    image_save:
+      img_save_en: false
+      interval: 1
+    imu:
+      acc_cov: 0.5
+      b_acc_cov: 0.0001
+      b_gyr_cov: 0.0001
+      gyr_cov: 0.3
+      imu_en: true
+      imu_int_frame: 30
+    lio:
+      beam_err: 0.05
+      dept_err: 0.02
+      layer_init_num:
+      - 5
+      - 5
+      - 5
+      - 5
+      - 5
+      max_iterations: 5
+      max_layer: 2
+      max_points_num: 50
+      min_eigen_value: 0.0025
+      voxel_size: 0.5
+    local_map:
+      half_map_size: 100
+      map_sliding_en: false
+      sliding_thresh: 8.0
+    localizability:
+      calibration:
+        enabled: false
+        histogram_bins: 0
+    pcd_save:
+      colmap_output_en: false
+      filter_size_pcd: 0.15
+      interval: -1
+      pcd_save_en: false
+      type: 0
+    preprocess:
+      blind: 0.8
+      filter_size_surf: 0.1
+      lidar_type: 1
+      point_filter_num: 1
+      scan_line: 6
+    publish:
+      blind_rgb_points: 0.0
+      dense_map_en: true
+      lidar_information_en: true
+      lidar_information_topic: /lidar_measurement_information
+      lidar_localizability_calibration_en: false
+      lidar_localizability_calibration_qos_depth: 0
+      lidar_localizability_calibration_topic: /lidar_localizability_calibration
+      metric_cloud_en: true
+      metric_cloud_topic: /cloud_registered_metric
+      pub_effect_point_en: false
+      pub_plane_en: false
+      pub_scan_num: 1
+    time_offset:
+      exposure_time_init: 0.0
+      img_time_offset: 0.0
+      imu_time_offset: -0.017737000
+    uav:
+      gravity_align_en: false
+      imu_rate_odom: false
+    vio:
+      exposure_estimate_en: true
+      img_point_cov: 100
+      inv_expo_cov: 0.1
+      inverse_composition_en: false
+      max_iterations: 5
+      normal_en: true
+      outlier_threshold: 1000
+      patch_pyrimid_level: 4
+      patch_size: 8
+      raycast_en: false
