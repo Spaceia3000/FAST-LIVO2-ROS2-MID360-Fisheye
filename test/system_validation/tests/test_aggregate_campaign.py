@@ -19,8 +19,12 @@ def valid_input():
         "content_sampling": {"structural_violations": {}},
         "header_timing": {"positive_delta_s": {"median": 0.1}},
     }}, "tf_audit": {"nonfinite_transform_count": 0},
-        "coverage": {"by_role": {"lidar": {"first_ns": 0,
-            "last_ns": 10_000_000_000, "duration_s": 10.0}}}}
+        "coverage": {"by_role": {
+            "lidar": {"first_ns": 0, "last_ns": 10_000_000_000,
+                      "duration_s": 10.0},
+            "imu": {"first_ns": 0, "last_ns": 10_000_000_000,
+                    "duration_s": 10.0},
+        }}}
 
 
 def valid_manifest():
