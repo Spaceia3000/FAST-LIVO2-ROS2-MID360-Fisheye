@@ -1,0 +1,31 @@
+schema_version: 1
+copied_date: "2026-09-17"
+copy_policy: byte_exact_no_parameter_edits
+source_workspace: /home/breidy/Documents/ham_slam_ws
+source_directory: /home/breidy/Documents/ham_slam_ws/src/ham_slam/ha_mslam_bringup/config
+equivalent_legacy_source:
+  directory: /home/breidy/Documents/ha_mslam_legacy_ws/src/ha_mslam/ha_mslam_bringup/config
+  verification: all_three_files_have_identical_sha256_byte_for_byte
+files:
+  LO:
+    file: fast_livo2_ugv_v1_lo.yaml
+    source: /home/breidy/Documents/ham_slam_ws/src/ham_slam/ha_mslam_bringup/config/fast_livo2_ugv_v1_lo.yaml
+    equivalent_legacy_source: /home/breidy/Documents/ha_mslam_legacy_ws/src/ha_mslam/ha_mslam_bringup/config/fast_livo2_ugv_v1_lo.yaml
+    sha256: 0c1efc0d50ff75b24dc287cdae5d31251dc53d7aec943ad756872e4f36c4ab79
+  LIO:
+    file: fast_livo2_ugv_v1_lio.yaml
+    source: /home/breidy/Documents/ham_slam_ws/src/ham_slam/ha_mslam_bringup/config/fast_livo2_ugv_v1_lio.yaml
+    equivalent_legacy_source: /home/breidy/Documents/ha_mslam_legacy_ws/src/ha_mslam/ha_mslam_bringup/config/fast_livo2_ugv_v1_lio.yaml
+    sha256: 9c58bf710884fe55d61af6de46c5204c30f789b2e9fe33d92bc81ca1ecf8ff66
+  LIVO:
+    file: fast_livo2_ugv_v1_livo.yaml
+    source: /home/breidy/Documents/ham_slam_ws/src/ham_slam/ha_mslam_bringup/config/fast_livo2_ugv_v1_livo.yaml
+    equivalent_legacy_source: /home/breidy/Documents/ha_mslam_legacy_ws/src/ha_mslam/ha_mslam_bringup/config/fast_livo2_ugv_v1_livo.yaml
+    sha256: 204e244e9776388e03b07219f2dcf2fe4da394f419c77a93fcb94c2cf7bdbb10
+limitations:
+  camera_time_zero: >-
+    The copied profiles retain img_time_offset: 0.0 and exposure_time_init: 0.0.
+    This is provenance, not evidence that camera timing is physically zero.
+  scope: >-
+    These profiles are FAST-LIVO2 parameter inputs only. No HA_MSLAM package,
+    launch file, node, binary or runtime dependency is used.

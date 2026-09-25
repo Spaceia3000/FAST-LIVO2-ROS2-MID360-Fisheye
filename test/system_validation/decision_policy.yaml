@@ -1,0 +1,70 @@
+policy_schema_version: 1
+schema_version: 1
+name: FAST-LIVO2 scientific validation campaign decision policy
+scope: >-
+  Structural and numerical validity for the explicitly listed datasets, modes,
+  repetitions, commit, parameters and machine. This policy makes no universal
+  robustness or accuracy claim.
+
+data_integrity:
+  invalid_on:
+    - duplicate or regressing bag/header timestamps
+    - sampled non-finite LiDAR/IMU data
+    - malformed sampled LiDAR/image messages
+    - non-finite TF transforms
+
+functional:
+  required:
+    - runner cell evidence and supported schema
+    - completed playback
+    - effective parameter verification
+    - successful output-bag postflight
+    - non-empty /aft_mapped_to_init
+
+numerical:
+  finite_fraction_required: 1.0
+  invalid_quaternion_count_required: 0
+  lidar_information_required: true
+  lidar_information_matrix_shape: [6, 6]
+  lidar_information_symmetric_required: true
+  lidar_information_psd_required: true
+  lidar_information_tolerance_relative_factor: 1.0e-9
+  lidar_information_tolerance_definition: >-
+    Relative numerical factor used by the analyzer for scale-aware symmetry and
+    PSD tolerance; it is not an absolute eigenvalue threshold.
+
+temporal:
+  strictly_monotonic_output_stamps_required: true
+  tail_coverage_policy: >-
+    First require output_first within
+    [input_first - tolerance, input_last + tolerance], then require
+    input_last - output_last <= tolerance, where tolerance is
+    max(3 * median_lidar_period, tail_minimum_tolerance_s).
+  tail_minimum_tolerance_s: 1.0
+  descriptive_not_hard_fail_without_external_physical_limit:
+    - gap candidates
+    - LiDAR-camera and LiDAR-IMU synchronization deltas
+    - point-to-plane residual
+    - information-matrix condition number
+
+shutdown:
+  unexpected_node_or_recorder_exit_status: INVALID_SHUTDOWN
+  note: shutdown failure is reported separately from algorithmic output validity
+
+realtime:
+  default_status: DESCRIPTIVE
+  note: no pass/fail without explicit hardware-normalized criterion and valid instrumentation
+
+accuracy:
+  without_ground_truth: NOT_ESTABLISHED
+  with_ground_truth: MEASURED
+  note: ATE/RPE are reported without an invented universal pass threshold
+
+repeatability:
+  grouping: dataset_and_mode
+  metrics: [path_length_m, duration_s, odometry_count, endpoint_proxy_m, elapsed_s,
+            cpu_mean_percent, rss_max_bytes]
+  exploratory_ci_min_n: 3
+  bootstrap_samples: 10000
+  bootstrap_seed: 20260917
+  n3_ci_label: exploratory

@@ -1,0 +1,76 @@
+schema_version: 1
+# Fixed, pre-specified ordering seed. It is recorded in every run and summary.
+schedule_seed: 20260917
+
+# Roots are deliberately distinct. Bags are read-only and never repaired in place.
+data_roots:
+  official: ${FAST_LIVO2_OFFICIAL_DATA_ROOT}
+  ugv: ${FAST_LIVO2_UGV_DATA_ROOT}
+
+datasets:
+  - &official
+    id: HIT_Graffiti_Wall_02
+    enabled: true
+    purpose: validation
+    data_role: benchmark
+    data_root: official
+    bag_relative_path: HIT_Graffiti_Wall_02
+    sensor_topics:
+      lidar: /livox/lidar
+      imu: /livox/imu
+      image: /left_camera/image
+    launch:
+      launch_file: mapping_aviz.launch.py
+      base_params: config/avia.yaml
+      camera_params: config/camera_pinhole.yaml
+      profile_provenance: "FAST-LIVO2 repository profiles, hashed per run."
+      extra_args: [use_rviz:=False, use_respawn:=False, use_sim_time:=True]
+    variants: [LO, LIO, LIVO]
+    repetitions: 1
+    playback_rate: 1.0
+    record:
+      cloud_registered: false
+
+  - <<: *official
+    id: CBD_Building_03
+    bag_relative_path: CBD_Building_03
+    repetitions: 3
+
+  - <<: *official
+    id: HIT_Graffiti_Wall_03
+    bag_relative_path: HIT_Graffiti_Wall_03
+
+  - <<: *official
+    id: HKU_Cultural_Center_02
+    bag_relative_path: HKU_Cultural_Center_02
+
+  - <<: *official
+    id: CBD_Building_02
+    bag_relative_path: CBD_Building_02
+
+  - id: ugv_custom_fastlivo2_10
+    enabled: true
+    purpose: validation
+    data_role: evaluation
+    data_root: ugv
+    bag_relative_path: ugv_custom_fastlivo2_10
+    sensor_topics:
+      lidar: /livox/lidar
+      imu: /livox/imu
+      image: /camera/camera/color/image_raw
+    launch:
+      launch_file: mapping_aviz.launch.py
+      variant_params:
+        LO: test/system_validation/profiles/ugv/fast_livo2_ugv_v1_lo.yaml
+        LIO: test/system_validation/profiles/ugv/fast_livo2_ugv_v1_lio.yaml
+        LIVO: test/system_validation/profiles/ugv/fast_livo2_ugv_v1_livo.yaml
+      camera_params: null
+      profile_provenance: "Byte-exact FAST-LIVO2 UGV profiles vendored for validation."
+      profile_provenance_file: test/system_validation/profiles/ugv/provenance.yaml
+      extra_args: [use_rviz:=False, use_respawn:=False, use_sim_time:=True]
+    variants: [LO, LIO, LIVO]
+    repetitions: 1
+    playback_rate: 1.0
+    record:
+      cloud_registered: false
+    notes: "Non-calibration campus UGV sequence; original bag remains immutable."
