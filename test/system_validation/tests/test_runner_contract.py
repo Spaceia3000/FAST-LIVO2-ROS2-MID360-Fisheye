@@ -253,10 +253,11 @@ def test_recorded_metric_cloud_contract_is_fail_closed(tmp_path):
 def test_recorded_metric_cloud_contract_accepts_complete_pairing(tmp_path):
     metrics = tmp_path / "metrics.json"
     expected = {"exact_pairing_complete": True, "exact_pair_count": 3}
-    metrics.write_text(json.dumps({"pose_metric_cloud_contract": expected}),
+    metrics.write_text(json.dumps({"pose_metric_cloud_contract": expected,
+                                  "pose_tf_contract": complete_tf_contract()}),
                        encoding="utf-8")
     dataset = minimal_dataset(record={"metric_cloud": True})
-    assert runner.verify_recorded_contract(metrics, dataset) == expected
+    assert runner.verify_recorded_contract(metrics, dataset)["pose_metric_cloud_contract"] == expected
 
 
 def test_baseline_topics_exclude_disabled_localizability_calibration():
@@ -278,7 +279,7 @@ def test_vendored_ugv_profiles_match_recorded_hashes():
     provenance_path = ROOT / "profiles" / "ugv" / "provenance.yaml"
     provenance = yaml.safe_load(provenance_path.read_text(encoding="utf-8"))
     for record in provenance["files"].values():
-        path = provenance_path.parent / record["file"]
+        path = runner.REPO / record["file"]
         assert path.is_file()
         assert hashlib.sha256(path.read_bytes()).hexdigest() == record["sha256"]
 
@@ -508,3 +509,62 @@ def test_repetition_filter_rejects_selection_without_match():
     with pytest.raises(RuntimeError, match="produced no schedule cells"):
         runner.filter_schedule_repetitions(
             [{"repetition": 1, "variant": "LO"}], [2])
+
+
+@pytest.mark.parametrize("tf_contract", [None, {}, {"exact_pairing_complete": False}])
+def test_recorded_tf_contract_fails_closed(tmp_path, tf_contract):
+    metrics = tmp_path / "metrics.json"
+    doc = {"pose_metric_cloud_contract": {"exact_pairing_complete": True}}
+    if tf_contract is not None:
+        doc["pose_tf_contract"] = tf_contract
+    metrics.write_text(json.dumps(doc))
+    with pytest.raises(RuntimeError, match="TF/odometry"):
+        runner.verify_recorded_contract(metrics, minimal_dataset(record={"metric_cloud": True}))
+
+
+def test_tf_recorded_in_every_mode(tmp_path):
+    for mode in runner.MODES:
+        commands, _, topics = runner.commands_for(minimal_dataset(), mode, tmp_path / "in", tmp_path / "out")
+        assert "/tf" in topics and "/tf" in commands["record"]
+
+
+@pytest.mark.parametrize("mode", ["LO", "LIO", "LIVO"])
+def test_canonical_manifest_profiles_verified(mode):
+    manifest = yaml.safe_load((ROOT / "datasets.s2_metric_cloud.yaml").read_text())
+    dataset = manifest["datasets"][-1]
+    paths = runner.variant_configs(dataset, mode)
+    assert paths[0] == runner.REPO / "config" / f"ugv_v1_{mode.lower()}.yaml"
+    assert len(runner.verify_vendored_profile_hashes(dataset, mode, paths)["verified_files"]) == 3
+
+
+def test_provenance_cannot_omit_nonselected_mode(tmp_path):
+    dataset, files = _temporary_vendored_profiles(tmp_path)
+    path = Path(dataset["launch"]["profile_provenance_file"])
+    doc = yaml.safe_load(path.read_text())
+    del doc["files"]["LIO"]
+    path.write_text(yaml.safe_dump(doc))
+    with pytest.raises(RuntimeError):
+        runner.verify_vendored_profile_hashes(dataset, "LO", [files["LO"]])
+
+
+
+def complete_tf_contract():
+    return {
+        "exact_pairing_complete": True, "available": True,
+        "edge": ["camera_init", "aft_mapped"],
+        "association": "exact_header_timestamp", "payload_comparison": "float64_bit_exact",
+        "odometry_count": 3, "fast_tf_count": 3, "exact_pair_count": 3,
+        "duplicate_odometry_stamp_count": 0, "duplicate_tf_stamp_count": 0,
+        "odometry_without_tf_count": 0, "tf_without_odometry_count": 0,
+        "frame_mismatch_count": 0, "pose_payload_mismatch_count": 0,
+    }
+
+
+@pytest.mark.parametrize("missing", list(complete_tf_contract()))
+def test_incomplete_tf_evidence_fails_closed(tmp_path, missing):
+    contract = complete_tf_contract()
+    del contract[missing]
+    metrics = tmp_path / "metrics.json"
+    metrics.write_text(json.dumps({"pose_tf_contract": contract}))
+    with pytest.raises(RuntimeError, match="TF/odometry"):
+        runner.verify_recorded_contract(metrics, minimal_dataset())

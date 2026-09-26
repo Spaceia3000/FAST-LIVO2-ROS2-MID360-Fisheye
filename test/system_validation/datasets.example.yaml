@@ -61,11 +61,11 @@ datasets:
     launch:
       launch_file: mapping_aviz.launch.py
       variant_params:
-        LO: test/system_validation/profiles/ugv/fast_livo2_ugv_v1_lo.yaml
-        LIO: test/system_validation/profiles/ugv/fast_livo2_ugv_v1_lio.yaml
-        LIVO: test/system_validation/profiles/ugv/fast_livo2_ugv_v1_livo.yaml
+        LO: config/ugv_v1_lo.yaml
+        LIO: config/ugv_v1_lio.yaml
+        LIVO: config/ugv_v1_livo.yaml
       camera_params: null
-      profile_provenance: "Byte-exact FAST-LIVO2 UGV profiles vendored for validation."
+      profile_provenance: "Canonical FAST-LIVO2 config profiles; byte-exact audited parameters."
       profile_provenance_file: test/system_validation/profiles/ugv/provenance.yaml
       extra_args: [use_rviz:=False, use_respawn:=False, use_sim_time:=True]
     variants: [LO, LIO, LIVO]

@@ -269,3 +269,76 @@ def test_current_analysis_binds_outputs_before_metrics_json_exists(tmp_path):
         analysis.ODOM_TOPIC + "_per_lidar_input"
     ] == pytest.approx(1.0)
     assert coverage["output_odometry_duration_over_input_duration"] == pytest.approx(1.0)
+
+
+
+def fast_pose(stamp=100):
+    return {**_pose(stamp, 1.23, 0.713), "frame_id": "camera_init", "child_frame_id": "aft_mapped"}
+
+
+def test_exact_tf_contract_pass_and_ignores_other_edges():
+    odom = [fast_pose(100), fast_pose(200)]
+    transforms = [dict(row) for row in odom] + [{"frame_id": "map", "child_frame_id": "odom"}]
+    result = analysis.pose_tf_contract(odom, transforms)
+    assert result["exact_pairing_complete"] is True
+    assert result["exact_pair_count"] == 2
+    assert analysis.analyze(odom, [], [], transforms=transforms)["pose_tf_contract"] == result
+
+
+@pytest.mark.parametrize("case", ["missing", "duplicate", "stamp", "extra", "odom_duplicate",
+                                  "parent", "child", "odom_frame", "position", "quaternion", "signed_zero"])
+def test_exact_tf_contract_rejects_defects(case):
+    odom = [fast_pose()]
+    transforms = [fast_pose()]
+    if case == "missing": transforms = []
+    elif case == "duplicate": transforms.append(fast_pose())
+    elif case == "extra": transforms.append(fast_pose(101))
+    elif case == "odom_duplicate": odom.append(fast_pose())
+    elif case == "stamp": transforms[0]["stamp_ns"] += 1
+    elif case == "parent": transforms[0]["frame_id"] = "map"
+    elif case == "child": transforms[0]["child_frame_id"] = "base_link"
+    elif case == "odom_frame": odom[0]["frame_id"] = "map"
+    elif case == "position": transforms[0]["x"] = math.nextafter(odom[0]["x"], math.inf)
+    elif case == "quaternion": transforms[0]["qw"] = math.nextafter(odom[0]["qw"], math.inf)
+    elif case == "signed_zero": transforms[0]["y"] = -0.0
+    assert analysis.pose_tf_contract(odom, transforms)["exact_pairing_complete"] is False
+
+
+def test_exact_tf_uses_zero_header_stamp_never_bag_time():
+    from types import SimpleNamespace as NS
+    header = NS(stamp=NS(sec=0, nanosec=0), frame_id="camera_init")
+    position = NS(x=1.0, y=0.0, z=-0.0)
+    rotation = NS(x=0.0, y=0.0, z=0.0, w=1.0)
+    msg = NS(header=header, child_frame_id="aft_mapped", pose=NS(pose=NS(position=position, orientation=rotation)))
+    tf = NS(header=header, child_frame_id="aft_mapped", transform=NS(translation=position, rotation=rotation))
+    odom = analysis.pose_row(msg, 999)
+    assert odom["header_stamp_ns"] == 0
+    assert analysis.pose_tf_contract([odom], [analysis.tf_row(tf)])["exact_pairing_complete"]
+
+
+def test_bag_reader_deserializes_tfmessage_and_retains_only_fast_edge(monkeypatch, tmp_path):
+    from types import SimpleNamespace as NS
+    header = NS(stamp=NS(sec=12, nanosec=345), frame_id="camera_init")
+    position = NS(x=1.0, y=2.0, z=3.0)
+    rotation = NS(x=0.0, y=0.0, z=0.0, w=1.0)
+    fast = NS(header=header, child_frame_id="aft_mapped", transform=NS(translation=position, rotation=rotation))
+    unrelated = NS(header=NS(frame_id="map"), child_frame_id="odom")
+    odom = NS(header=header, child_frame_id="aft_mapped", pose=NS(pose=NS(position=position, orientation=rotation)))
+    types = {analysis.ODOM_TOPIC: "nav_msgs/msg/Odometry", "/tf": "tf2_msgs/msg/TFMessage"}
+    pending = [("/tf", NS(transforms=[unrelated, fast]), 999), (analysis.ODOM_TOPIC, odom, 888)]
+    class Reader:
+        def open(self, *args): pass
+        def get_all_topics_and_types(self): return [NS(name=k, type=v) for k, v in types.items()]
+        def has_next(self): return bool(pending)
+        def read_next(self): return pending.pop(0)
+    decoded = []
+    def deserialize(data, message_type):
+        decoded.append(message_type)
+        return data
+    monkeypatch.setitem(sys.modules, "rosbag2_py", NS(SequentialReader=Reader, StorageOptions=lambda **kw: kw, ConverterOptions=lambda *a: a))
+    monkeypatch.setitem(sys.modules, "rclpy.serialization", NS(deserialize_message=deserialize))
+    monkeypatch.setitem(sys.modules, "rosidl_runtime_py.utilities", NS(get_message=lambda value: value))
+    poses, _, _, _, _, transforms = analysis.read_bag(tmp_path)
+    assert decoded == ["tf2_msgs/msg/TFMessage", "nav_msgs/msg/Odometry"]
+    assert len(transforms) == 1
+    assert analysis.pose_tf_contract(poses, transforms)["exact_pairing_complete"]

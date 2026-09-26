@@ -1697,15 +1697,14 @@ void LIVMapper::publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry
   odomAftMapped.header.stamp = sec2Stamp(LidarMeasures.last_lio_update_time);
   set_posestamp(odomAftMapped.pose.pose);
 
-  tf2::Transform transform;
-  tf2::Quaternion q;
-  transform.setOrigin(tf2::Vector3(_state.pos_end(0), _state.pos_end(1), _state.pos_end(2)));
-  q.setW(geoQuat.w);
-  q.setX(geoQuat.x);
-  q.setY(geoQuat.y);
-  q.setZ(geoQuat.z);
-  transform.setRotation(q);
-  tf_broadcaster->sendTransform(geometry_msgs::msg::TransformStamped(createTransformStamped(transform, odomAftMapped.header.stamp, "camera_init", "aft_mapped")));
+  geometry_msgs::msg::TransformStamped transform;
+  transform.header = odomAftMapped.header;
+  transform.child_frame_id = odomAftMapped.child_frame_id;
+  transform.transform.translation.x = odomAftMapped.pose.pose.position.x;
+  transform.transform.translation.y = odomAftMapped.pose.pose.position.y;
+  transform.transform.translation.z = odomAftMapped.pose.pose.position.z;
+  transform.transform.rotation = odomAftMapped.pose.pose.orientation;
+  tf_broadcaster->sendTransform(transform);
   pubOdomAftMapped->publish(odomAftMapped);
 }
 
