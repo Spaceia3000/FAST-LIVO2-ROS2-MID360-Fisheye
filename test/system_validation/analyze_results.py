@@ -7,6 +7,7 @@ import csv
 import json
 import math
 import re
+import struct
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
@@ -14,6 +15,7 @@ from typing import Any, Iterable
 import numpy as np
 import yaml
 
+TF_TOPIC = "/tf"
 ODOM_TOPIC = "/aft_mapped_to_init"
 INFO_TOPIC = "/lidar_measurement_information"
 LOCAL_TOPIC = "/lidar_localizability_calibration"
@@ -46,6 +48,59 @@ def json_safe(value: Any) -> Any:
     return value
 
 
+def exact_header_stamp(msg: Any) -> int:
+    # Scientific association never substitutes recorder time, including at zero.
+    stamp = msg.header.stamp
+    return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
+
+
+def tf_row(msg: Any) -> dict[str, Any]:
+    t, q = msg.transform.translation, msg.transform.rotation
+    return {
+        "stamp_ns": exact_header_stamp(msg),
+        "frame_id": msg.header.frame_id, "child_frame_id": msg.child_frame_id,
+        "x": float(t.x), "y": float(t.y), "z": float(t.z),
+        "qx": float(q.x), "qy": float(q.y), "qz": float(q.z), "qw": float(q.w),
+    }
+
+
+def pose_tf_contract(odom: list[dict], transforms: list[dict]) -> dict[str, Any]:
+    edge = ("camera_init", "aft_mapped")
+    frame = lambda row: (row.get("frame_id"), row.get("child_frame_id"))
+    # Ignore all other TF edges; an absent/misframed FAST edge leaves odom unmatched.
+    fast = [row for row in transforms if frame(row) == edge]
+    stamp = lambda row: int(row.get("header_stamp_ns", row["stamp_ns"]))
+    odom_counts = Counter(stamp(row) for row in odom)
+    tf_counts = Counter(stamp(row) for row in fast)
+    by_stamp = {stamp(row): row for row in fast}
+    components = ("x", "y", "z", "qx", "qy", "qz", "qw")
+    mismatches = 0
+    for row in odom:
+        other = by_stamp.get(stamp(row))
+        if other is not None:
+            a = [float(row.get(k, math.nan)) for k in components]
+            b = [float(other.get(k, math.nan)) for k in components]
+            if not (_finite(a) and _finite(b)) or struct.pack("!7d", *a) != struct.pack("!7d", *b):
+                mismatches += 1
+    failures = {
+        "duplicate_odometry_stamp_count": sum(n - 1 for n in odom_counts.values()),
+        "duplicate_tf_stamp_count": sum(n - 1 for n in tf_counts.values()),
+        "odometry_without_tf_count": sum((odom_counts - tf_counts).values()),
+        "tf_without_odometry_count": sum((tf_counts - odom_counts).values()),
+        "frame_mismatch_count": sum(frame(row) != edge for row in odom),
+        "pose_payload_mismatch_count": mismatches,
+    }
+    return {
+        "available": bool(odom and fast),
+        "edge": list(edge), "association": "exact_header_timestamp",
+        "payload_comparison": "float64_bit_exact",
+        "odometry_count": len(odom), "fast_tf_count": len(fast),
+        "exact_pair_count": sum((odom_counts & tf_counts).values()),
+        **failures,
+        "exact_pairing_complete": bool(odom and fast and not any(failures.values())),
+    }
+
+
 def pose_row(msg: Any, bag_stamp: int) -> dict[str, Any]:
     pose = getattr(msg, "pose", msg)
     pose = getattr(pose, "pose", pose)
@@ -56,6 +111,7 @@ def pose_row(msg: Any, bag_stamp: int) -> dict[str, Any]:
     ]
     return {
         "stamp_ns": _stamp_ns(msg, bag_stamp),
+        "header_stamp_ns": exact_header_stamp(msg),
         "x": float(values[0]), "y": float(values[1]), "z": float(values[2]),
         "qx": float(values[3]), "qy": float(values[4]),
         "qz": float(values[5]), "qw": float(values[6]),
@@ -142,7 +198,7 @@ def local_row(msg: Any, bag_stamp: int) -> dict[str, Any]:
 
 def read_bag(
     path: Path, gt_topic: str | None = None
-) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict]]:
+) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
     try:
         import rosbag2_py
         from rclpy.serialization import deserialize_message
@@ -155,7 +211,9 @@ def read_bag(
         rosbag2_py.ConverterOptions("", ""),
     )
     types = {item.name: item.type for item in reader.get_all_topics_and_types()}
-    wanted = {ODOM_TOPIC, INFO_TOPIC, LOCAL_TOPIC, METRIC_CLOUD_TOPIC}
+    wanted = {ODOM_TOPIC, INFO_TOPIC, LOCAL_TOPIC, METRIC_CLOUD_TOPIC, TF_TOPIC}
+    if TF_TOPIC in types and types[TF_TOPIC] != "tf2_msgs/msg/TFMessage":
+        raise RuntimeError("/tf must have type tf2_msgs/msg/TFMessage")
     if gt_topic:
         wanted.add(gt_topic)
     messages = {name: get_message(types[name]) for name in wanted if name in types}
@@ -164,6 +222,7 @@ def read_bag(
     local: list[dict] = []
     metric_cloud: list[dict] = []
     gt: list[dict] = []
+    transforms: list[dict] = []
     while reader.has_next():
         topic, data, timestamp = reader.read_next()
         if topic not in messages:
@@ -177,12 +236,15 @@ def read_bag(
             local.append(local_row(msg, timestamp))
         elif topic == METRIC_CLOUD_TOPIC:
             metric_cloud.append(cloud_row(msg, timestamp))
+        elif topic == TF_TOPIC:
+            transforms.extend(tf_row(t) for t in msg.transforms
+                              if (t.header.frame_id, t.child_frame_id) == ("camera_init", "aft_mapped"))
         elif topic == gt_topic:
             if hasattr(msg, "poses"):
                 gt.extend(pose_row(pose, timestamp) for pose in msg.poses)
             else:
                 gt.append(pose_row(msg, timestamp))
-    return odom, info, local, metric_cloud, gt
+    return odom, info, local, metric_cloud, gt, transforms
 
 
 def load_csv(path: Path) -> list[dict[str, Any]]:
@@ -196,7 +258,7 @@ def load_csv(path: Path) -> list[dict[str, Any]]:
                 item[key] = value
             elif key in {"available", "finite"}:
                 item[key] = value.lower() in {"1", "true", "yes"}
-            elif key == "stamp_ns" or key.endswith("_samples") or key == "effective_features":
+            elif key in {"stamp_ns", "header_stamp_ns"} or key.endswith("_samples") or key == "effective_features":
                 item[key] = int(value)
             else:
                 try:
@@ -849,6 +911,7 @@ def analyze(
     rpe_delta: float = 1.0, rpe_delta_unit: str = "seconds",
     run_manifests: list[Path] | None = None,
     metric_cloud: list[dict] | None = None,
+    transforms: list[dict] | None = None,
 ) -> dict[str, Any]:
     gt = gt or []
     metric_cloud = metric_cloud or []
@@ -892,6 +955,7 @@ def analyze(
         "lidar_information": eigen_metrics(info),
         "localizability_telemetry": eigen_metrics(local),
         "pose_metric_cloud_contract": pose_metric_cloud_contract(odom, metric_cloud),
+        "pose_tf_contract": pose_tf_contract(odom, transforms or []),
         "input_output_coverage": {
             "output_counts": {
                 ODOM_TOPIC: len(odom), INFO_TOPIC: len(info), LOCAL_TOPIC: len(local),
@@ -933,12 +997,13 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.bag:
-        odom, info, local, metric_cloud, gt = read_bag(args.bag, args.gt_topic)
+        odom, info, local, metric_cloud, gt, transforms = read_bag(args.bag, args.gt_topic)
     else:
         odom = load_csv(args.odom_csv)
         info = load_csv(args.info_csv) if args.info_csv else []
         local = load_csv(args.localizability_csv) if args.localizability_csv else []
         metric_cloud = []
+        transforms = []
         gt = load_csv(args.gt_csv) if args.gt_csv else []
 
     if not odom:
@@ -950,10 +1015,11 @@ def main() -> int:
     write_csv(args.output / "lidar_information.csv", info)
     write_csv(args.output / "localizability.csv", local)
     write_csv(args.output / "metric_cloud.csv", metric_cloud)
+    write_csv(args.output / "fast_tf.csv", transforms)
     summary = json_safe(analyze(
         odom, info, local, gt, args.max_gt_delta_s,
         args.rpe_delta, args.rpe_delta_unit, args.run_manifest,
-        metric_cloud=metric_cloud,
+        metric_cloud=metric_cloud, transforms=transforms,
     ))
     (args.output / "metrics.json").write_text(
         json.dumps(summary, indent=2, allow_nan=False) + "\n", encoding="utf-8"

@@ -15,12 +15,44 @@ The implementation exposes exactly the three modes selected by
 | LIO | 0 | 1 | true |
 | LIVO | 1 | 1 | true |
 
-The runner starts `fastlivo_mapping` directly. It does not use the repository
-launch files because `mapping_aviz.launch.py` unconditionally starts an image
-transport republisher and does not expose mode overrides. The `launch_file`
-manifest field remains provenance for the dataset profile; the runner applies
-the listed base/camera parameter files directly and then the typed overrides
-above.
+Canonical standalone launch (one FAST node and optional RViz, no HA dependency):
+
+```bash
+ros2 launch fast_livo s1_fast_golden.launch.py mode:=lo
+ros2 launch fast_livo s1_fast_golden.launch.py mode:=lio
+ros2 launch fast_livo s1_fast_golden.launch.py mode:=livo
+# Official dataset files, in order, followed by authoritative mode overrides:
+ros2 launch fast_livo s1_fast_golden.launch.py mode:=livo \
+  params_file:=/absolute/path/config/avia.yaml \
+  camera_params_file:=/absolute/path/config/camera_pinhole.yaml
+# Native compressed input; no image_transport republisher:
+ros2 launch fast_livo s1_fast_golden.launch.py mode:=livo \
+  input_mode:=compressed_direct image_topic:=/camera/image/compressed
+```
+
+`use_sim_time` and `use_rviz` default to true. Source the built FAST workspace
+and pinned Livox sensor underlay; the launch validates its typesupport without
+starting the driver. Raw input forces `common.enable_image_processing=false`.
+Custom parameter files remain intact and mode overrides are applied last.
+
+The existing scientific runner starts `fastlivo_mapping` directly with ordered
+base/camera files and typed overrides. The manifest `launch_file` is profile
+provenance, not a second execution path.
+
+GOLDEN scientific outputs are `/aft_mapped_to_init`,
+`/cloud_registered_metric`, `/lidar_measurement_information`, and the `/tf`
+edge `camera_init -> aft_mapped`. Information inherits the odometry header and
+body frame. The metric-cloud gate requires unique, strictly increasing cloud
+stamps that match odometry stamps and frames exactly; extra odometry is allowed.
+Every cell records `/tf` and requires a bijection with odometry by exact header
+stamp, with no duplicate FAST-edge stamps and bit-exact float64 translation and
+quaternion components. `pose_tf_contract` records this check; missing or failed
+TF evidence invalidates the cell. No nearest-neighbor association is used.
+
+The golden RViz configuration uses `camera_init`. `/cloud_registered` is a
+legacy/display diagnostic; `/path` and `/rgb_img` are also display outputs,
+not scientific timing truth. RGB may be empty in LO/LIO. Their existing timestamp
+semantics are unchanged.
 
 Calibration datasets are forbidden. The runner sets and verifies
 `localizability.calibration.enabled:=false`. Consequently,
@@ -39,10 +71,11 @@ both by JSON Schema and by runtime guards.
 The YAML document is validated inside the runner with
 `jsonschema.Draft202012Validator` before path access or process launch. The
 example contains five official sequences and `ugv_custom_fastlivo2_10`.
-The three UGV profiles are byte-exact, variant-specific copies under
-`profiles/ugv/`; their source paths and SHA-256 values are recorded in
+The three canonical UGV profiles are `config/ugv_v1_{lo,lio,livo}.yaml`
+at the repository root, with byte-exact audited content. Their source paths
+and SHA-256 values are recorded in
 `profiles/ugv/provenance.yaml`. Before every UGV cell starts a ROS process,
-the runner recomputes and fail-closed compares all three vendored hashes, then
+the runner recomputes and fail-closed compares all three canonical hashes, then
 verifies that the selected mode uses the profile recorded for that mode. The
 result is retained as `profile_hash_verification` in the resolved and run
 manifests. No HA_MSLAM executable, launch file, node, package or runtime
@@ -195,7 +228,9 @@ python3 test/system_validation/analyze_results.py \
 ```
 
 The analyzer also accepts synthetic/exported CSV inputs for offline review.
-The tests use only the bundled tiny CSV fixtures:
+The directed tests use synthetic fixtures and compile the current publication
+function against installed ROS message headers. A C++ compiler and ROS headers
+are required for the native bit-exact regression (10,000 poses):
 
 ```bash
 python3 -m pytest -q test/system_validation/tests
@@ -209,7 +244,7 @@ bound to existing laptop data. ROS 2 dynamic message support and the built
 sampled process-tree quantity, not machine-wide utilization. Topic rate is
 derived from output message timestamps. Input per-topic counts and timing are
 measured by a full read-only bag traversal, which adds substantial preflight
-time. The vendored UGV profiles retain `img_time_offset: 0.0` and
+time. The canonical UGV profiles retain `img_time_offset: 0.0` and
 `exposure_time_init: 0.0`; this is recorded provenance, not evidence that the
 physical camera timing offset is zero. The 5 s/120 s drain policy is conservative
 and may lengthen failed runs, but bounds the wait. Free disk is recorded before

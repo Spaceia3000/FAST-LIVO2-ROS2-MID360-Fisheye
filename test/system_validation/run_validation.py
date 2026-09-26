@@ -38,7 +38,7 @@ MODES = {
 INFO_TOPIC = "/lidar_measurement_information"
 LEGACY_CLOUD_TOPIC = "/cloud_registered"
 METRIC_CLOUD_TOPIC = "/cloud_registered_metric"
-BASE_TOPICS = [ODOM_TOPIC, INFO_TOPIC, "/parameter_events", "/rosout"]
+BASE_TOPICS = [ODOM_TOPIC, INFO_TOPIC, "/tf", "/parameter_events", "/rosout"]
 CALIBRATION_TOKEN = re.compile(
     r"(^|[/_.-])(calib(?:ration)?|calibracion|intrinsic|extrinsic)(?=$|[/_.-])",
     re.IGNORECASE,
@@ -232,8 +232,12 @@ def verify_vendored_profile_hashes(
     if not isinstance(document, dict) or document.get("schema_version") != 1:
         raise RuntimeError("profile provenance schema_version must be 1")
     records = document.get("files")
-    if not isinstance(records, dict) or variant not in records:
+    if not isinstance(records, dict) or set(records) != set(MODES):
         raise RuntimeError(f"profile provenance has no record for variant {variant}")
+    path_base = document.get("path_base", "provenance_directory")
+    if path_base not in {"repository", "provenance_directory"}:
+        raise RuntimeError("unknown profile provenance path_base")
+    profile_root = REPO if path_base == "repository" else provenance_path.parent
     verified = []
     resolved_by_variant: dict[str, Path] = {}
     for name, record in sorted(records.items()):
@@ -244,8 +248,8 @@ def verify_vendored_profile_hashes(
             raise RuntimeError(f"profile provenance record {name} has no file")
         if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
             raise RuntimeError(f"profile provenance record {name} has invalid sha256")
-        profile_path = (provenance_path.parent / filename).resolve()
-        if not is_within(profile_path, provenance_path.parent.resolve()):
+        profile_path = (profile_root / filename).resolve()
+        if not is_within(profile_path, profile_root.resolve()):
             raise RuntimeError(f"profile provenance record {name} escapes its directory")
         if not profile_path.is_file():
             raise RuntimeError(f"vendored profile is absent: {profile_path}")
@@ -353,7 +357,30 @@ def verify_recorded_contract(metrics_path: Path, dataset: dict[str, Any]) -> dic
                 "metric cloud/odometry exact-pairing contract failed: "
                 + json.dumps(contract, sort_keys=True)
             )
-    return contract
+    tf_contract = metrics.get("pose_tf_contract", {})
+    tf_failure_counts = (
+        "duplicate_odometry_stamp_count", "duplicate_tf_stamp_count",
+        "odometry_without_tf_count", "tf_without_odometry_count",
+        "frame_mismatch_count", "pose_payload_mismatch_count",
+    )
+    count = tf_contract.get("odometry_count")
+    tf_complete = (
+        tf_contract.get("exact_pairing_complete") is True
+        and tf_contract.get("available") is True
+        and tf_contract.get("edge") == ["camera_init", "aft_mapped"]
+        and tf_contract.get("association") == "exact_header_timestamp"
+        and tf_contract.get("payload_comparison") == "float64_bit_exact"
+        and type(count) is int and count > 0
+        and tf_contract.get("fast_tf_count") == count
+        and tf_contract.get("exact_pair_count") == count
+        and all(tf_contract.get(key) == 0 for key in tf_failure_counts)
+    )
+    if not tf_complete:
+        raise RuntimeError(
+            "TF/odometry exact-pairing contract failed: "
+            + json.dumps(tf_contract, sort_keys=True)
+        )
+    return {"pose_metric_cloud_contract": contract, "pose_tf_contract": tf_contract}
 
 
 def input_analysis_command(dataset: dict[str, Any], bag: Path,
@@ -759,7 +786,7 @@ def execute(dataset: dict[str, Any], variant: str, repetition: int,
         monitor.start()
         wait_until("FAST-LIVO2 node", lambda: NODE_NAME in ros_list("node"),
                    [procs["record"], procs["node"]], readiness_timeout_s)
-        required_outputs = {ODOM_TOPIC, INFO_TOPIC}
+        required_outputs = {ODOM_TOPIC, INFO_TOPIC, "/tf"}
         if dataset.get("record", {}).get("metric_cloud", False):
             required_outputs.add(METRIC_CLOUD_TOPIC)
         wait_until("ROS graph outputs",
