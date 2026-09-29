@@ -359,7 +359,12 @@ void LIVMapper::initializeSubscribersAndPublishers()
     sub_img = this->node->create_subscription<sensor_msgs::msg::Image>(
       img_topic, 200000, std::bind(&LIVMapper::img_cbk, this, std::placeholders::_1));
   }
-  pubLaserCloudFullRes = this->node->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", 100);
+  auto visual_qos = rclcpp::QoS(rclcpp::KeepLast(1));
+  visual_qos.best_effort();
+  visual_qos.durability_volatile();
+  pubLaserCloudFullRes =
+      this->node->create_publisher<sensor_msgs::msg::PointCloud2>(
+          "/cloud_registered", visual_qos);
   if (metric_cloud_en)
   {
     pubLaserCloudMetric = this->node->create_publisher<sensor_msgs::msg::PointCloud2>(metric_cloud_topic, 100);
@@ -402,7 +407,9 @@ void LIVMapper::initializeSubscribersAndPublishers()
   pubLaserCloudDynRmed = this->node->create_publisher<sensor_msgs::msg::PointCloud2>("/dyn_obj_removed", 100);
   pubLaserCloudDynDbg = this->node->create_publisher<sensor_msgs::msg::PointCloud2>("/dyn_obj_dbg_hist", 100);
   mavros_pose_publisher = this->node->create_publisher<geometry_msgs::msg::PoseStamped>("/mavros/vision_pose/pose", 10);
-  pubImage = this->node->create_publisher<sensor_msgs::msg::Image>("/rgb_img", 1);
+  pubImage =
+      this->node->create_publisher<sensor_msgs::msg::Image>(
+          "/rgb_img", visual_qos);
   pubImuPropOdom = this->node->create_publisher<nav_msgs::msg::Odometry>("/LIVO2/imu_propagate", 10000);
   imu_prop_timer = this->node->create_wall_timer(0.004s, std::bind(&LIVMapper::imu_prop_callback, this));
   voxelmap_manager->voxel_map_pub_= this->node->create_publisher<visualization_msgs::msg::MarkerArray>("/planes", 10000);
@@ -1450,17 +1457,29 @@ void LIVMapper::publish_frame_world(const rclcpp::Publisher<sensor_msgs::msg::Po
 
   /*** Publish Frame ***/
   sensor_msgs::msg::PointCloud2 laserCloudmsg;
+  bool publish_visual_cloud = false;
   if (slam_mode_ == LIVO && LidarMeasures.lio_vio_flg == VIO)
   {
-    pcl::toROSMsg(*laserCloudWorldRGB, laserCloudmsg);
+    if (!laserCloudWorldRGB->empty())
+    {
+      pcl::toROSMsg(*laserCloudWorldRGB, laserCloudmsg);
+      publish_visual_cloud = true;
+    }
   }
-  if (slam_mode_ == ONLY_LIO || slam_mode_ == ONLY_LO)
-  { 
-    pcl::toROSMsg(*pcl_w_wait_pub, laserCloudmsg); 
+  else if (slam_mode_ == ONLY_LIO || slam_mode_ == ONLY_LO)
+  {
+    if (!pcl_w_wait_pub->empty())
+    {
+      pcl::toROSMsg(*pcl_w_wait_pub, laserCloudmsg);
+      publish_visual_cloud = true;
+    }
   }
-  laserCloudmsg.header.stamp = this->node->get_clock()->now(); //.fromSec(last_timestamp_lidar);
-  laserCloudmsg.header.frame_id = "camera_init";
-  pubLaserCloudFullRes->publish(laserCloudmsg);
+  if (publish_visual_cloud)
+  {
+    laserCloudmsg.header.stamp = this->node->get_clock()->now(); //.fromSec(last_timestamp_lidar);
+    laserCloudmsg.header.frame_id = "camera_init";
+    pubLaserCloudFullRes->publish(laserCloudmsg);
+  }
 
   /**************** save map ****************/
   /* 1. make sure you have enough memories
