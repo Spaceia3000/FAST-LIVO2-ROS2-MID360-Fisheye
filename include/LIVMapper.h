@@ -53,7 +53,7 @@ public:
   void livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::ConstSharedPtr &msg_in);
   void imu_cbk(const sensor_msgs::msg::Imu::ConstSharedPtr &msg_in);
   void img_cbk(const sensor_msgs::msg::Image::ConstSharedPtr &msg_in);
-  void publish_img_rgb(const image_transport::Publisher &pubImage, VIOManagerPtr vio_manager);
+  void publish_img_rgb(const rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr &pubImage, VIOManagerPtr vio_manager);
   void publish_frame_world(const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr &pubLaserCloudFullRes, VIOManagerPtr vio_manager);
   void publish_visual_sub_map(const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr &pubSubVisualMap);
   void publish_effect_world(const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr &pubLaserCloudEffect, const std::vector<PointToPlane> &ptpl_list);
@@ -195,7 +195,7 @@ public:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudDyn;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudDynRmed;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudDynDbg;
-  image_transport::Publisher pubImage;
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pubImage;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr mavros_pose_publisher;
   rclcpp::TimerBase::SharedPtr imu_prop_timer;
   rclcpp::Node::SharedPtr node;
