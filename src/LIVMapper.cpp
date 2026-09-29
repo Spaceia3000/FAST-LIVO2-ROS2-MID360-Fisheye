@@ -346,7 +346,6 @@ void LIVMapper::initializeFiles()
 
 void LIVMapper::initializeSubscribersAndPublishers()
 {
-  image_transport::ImageTransport it(this->node);
   if (p_pre->lidar_type == AVIA) {
     sub_pcl = this->node->create_subscription<livox_ros_driver2::msg::CustomMsg>(lid_topic, 200000, std::bind(&LIVMapper::livox_pcl_cbk, this, std::placeholders::_1));
   } else {
@@ -403,7 +402,7 @@ void LIVMapper::initializeSubscribersAndPublishers()
   pubLaserCloudDynRmed = this->node->create_publisher<sensor_msgs::msg::PointCloud2>("/dyn_obj_removed", 100);
   pubLaserCloudDynDbg = this->node->create_publisher<sensor_msgs::msg::PointCloud2>("/dyn_obj_dbg_hist", 100);
   mavros_pose_publisher = this->node->create_publisher<geometry_msgs::msg::PoseStamped>("/mavros/vision_pose/pose", 10);
-  pubImage = it.advertise("/rgb_img", 1);
+  pubImage = this->node->create_publisher<sensor_msgs::msg::Image>("/rgb_img", 1);
   pubImuPropOdom = this->node->create_publisher<nav_msgs::msg::Odometry>("/LIVO2/imu_propagate", 10000);
   imu_prop_timer = this->node->create_wall_timer(0.004s, std::bind(&LIVMapper::imu_prop_callback, this));
   voxelmap_manager->voxel_map_pub_= this->node->create_publisher<visualization_msgs::msg::MarkerArray>("/planes", 10000);
@@ -1393,7 +1392,7 @@ bool LIVMapper::sync_packages(LidarMeasureGroup &meas)
   RCLCPP_ERROR(this->node->get_logger(), "out sync");
 }
 
-void LIVMapper::publish_img_rgb(const image_transport::Publisher &pubImage, VIOManagerPtr vio_manager)
+void LIVMapper::publish_img_rgb(const rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr &pubImage, VIOManagerPtr vio_manager)
 {
   cv::Mat img_rgb = vio_manager->img_cp;
   cv_bridge::CvImage out_msg;
@@ -1401,7 +1400,7 @@ void LIVMapper::publish_img_rgb(const image_transport::Publisher &pubImage, VIOM
   // out_msg.header.frame_id = "camera_init";
   out_msg.encoding = sensor_msgs::image_encodings::BGR8;
   out_msg.image = img_rgb;
-  pubImage.publish(out_msg.toImageMsg());
+  if (!img_rgb.empty()) pubImage->publish(*out_msg.toImageMsg());
 }
 
 // Provide output format for LiDAR-visual BA
