@@ -1718,9 +1718,11 @@ void LIVMapper::publish_mavros(const rclcpp::Publisher<geometry_msgs::msg::PoseS
 
 void LIVMapper::publish_path(const rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr &pubPath)
 {
+  const auto stamp = sec2Stamp(LidarMeasures.last_lio_update_time);
   set_posestamp(msg_body_pose.pose);
-  msg_body_pose.header.stamp = this->node->get_clock()->now();
+  msg_body_pose.header.stamp = stamp;
   msg_body_pose.header.frame_id = "camera_init";
+  path.header.stamp = stamp;
   path.poses.push_back(msg_body_pose);
   pubPath->publish(path);
 }
