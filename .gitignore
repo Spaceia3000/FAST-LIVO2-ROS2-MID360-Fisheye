@@ -1,2 +1,4 @@
 build/*
 Log/*.txt
+__pycache__/
+*.py[cod]
