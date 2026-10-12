@@ -43,6 +43,7 @@ def generate_launch_description():
         'use_respawn', 
         default_value='True',
         description='Whether to respawn if a node crashes. Applied when composition is disabled.')
+    output_dir_arg = DeclareLaunchArgument('output_dir', default_value='')
 
     avia_params_file = LaunchConfiguration('avia_params_file')
     camera_params_file = LaunchConfiguration('camera_params_file')
@@ -53,6 +54,7 @@ def generate_launch_description():
         avia_config_arg,
         camera_config_arg,
         use_respawn_arg,
+        output_dir_arg,
 
         # use parameter_blackboard as global parameters server and load camera params
         Node(
@@ -91,6 +93,7 @@ def generate_launch_description():
             name="laserMapping",
             parameters=[
                 avia_params_file,
+                {"output_dir": LaunchConfiguration("output_dir")},
             ],
             # https://docs.ros.org/en/humble/How-To-Guides/Getting-Backtraces-in-ROS-2.html
             prefix=[

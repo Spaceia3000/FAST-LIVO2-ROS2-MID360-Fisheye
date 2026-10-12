@@ -49,6 +49,11 @@ def generate_launch_description():
             default_value="true",
         ),
 
+        DeclareLaunchArgument(
+            "output_dir",
+            default_value="",
+        ),
+
         Node(
             package="fast_livo",
             executable="fastlivo_mapping",
@@ -56,7 +61,7 @@ def generate_launch_description():
             output="screen",
             parameters=[
                 LaunchConfiguration("params_file"),
-                {"use_sim_time": use_sim_time},
+                {"use_sim_time": use_sim_time, "output_dir": LaunchConfiguration("output_dir")},
             ],
         ),
 

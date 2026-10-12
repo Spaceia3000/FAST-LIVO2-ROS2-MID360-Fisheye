@@ -30,6 +30,9 @@ LIVMapper::LIVMapper(std::string node_name, const rclcpp::NodeOptions & options)
   p_imu.reset(new ImuProcess());
 
   readParameters(this->node);
+  fast_livo_runtime::set_output_directory(root_dir);
+  root_dir = fast_livo_runtime::output_directory().string();
+  RCLCPP_INFO(this->node->get_logger(), "Runtime output directory: %s", root_dir.c_str());
   VoxelMapConfig voxel_config;
   loadVoxelConfig(this->node, voxel_config);
 
@@ -43,7 +46,6 @@ LIVMapper::LIVMapper(std::string node_name, const rclcpp::NodeOptions & options)
   pcl_wait_save_intensity.reset(new PointCloudXYZI());
   voxelmap_manager.reset(new VoxelMapManager(voxel_config, voxel_map));
   vio_manager.reset(new VIOManager());
-  root_dir = ROOT_DIR;
   initializeFiles();
   initializeComponents(this->node);          // initialize components errors
   path.header.stamp = this->node->now();
@@ -88,6 +90,7 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   try_declare.template operator()<int>("common.lidar_en", 1);
   try_declare.template operator()<std::string>("common.img_topic", "/left_camera/image");
   try_declare.template operator()<bool>("common.enable_image_processing", false);
+  try_declare.template operator()<std::string>("output_dir", "");
 
   try_declare.template operator()<bool>("vio.normal_en", true);
   try_declare.template operator()<bool>("vio.inverse_composition_en", false);
@@ -162,6 +165,7 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   this->node->get_parameter("common.lidar_en", lidar_en);
   this->node->get_parameter("common.img_topic", img_topic);
   this->node->get_parameter("common.enable_image_processing", enable_image_processing);
+  this->node->get_parameter("output_dir", root_dir);
 
   this->node->get_parameter("vio.normal_en", normal_en);
   this->node->get_parameter("vio.inverse_composition_en", inverse_composition_en);
@@ -286,60 +290,26 @@ void LIVMapper::initializeComponents(rclcpp::Node::SharedPtr &node)
 void LIVMapper::initializeFiles() 
 {
     namespace fs = boost::filesystem;
-    // Define target directories for Colmap outputs and point clouds
+    // Runtime products must stay below output_dir. Never clear an existing run.
     std::vector<std::string> target_dirs = {
-        std::string(ROOT_DIR) + "Log/Colmap/images",
-        std::string(ROOT_DIR) + "Log/Colmap/sparse/0",
-        std::string(ROOT_DIR) + "Log/pcd",
-        std::string(ROOT_DIR) + "Log/image"
+        fast_livo_runtime::path("Log/Colmap/images").string(),
+        fast_livo_runtime::path("Log/Colmap/sparse/0").string(),
+        fast_livo_runtime::path("Log/pcd").string(),
+        fast_livo_runtime::path("Log/image").string(),
+        fast_livo_runtime::path("Log/result").string(),
+        fast_livo_runtime::path("Log/ref_cur_combine").string()
     };
-
-    // Conditionally clear and recreate directories when both flags are enabled
-    if (pcd_save_en && colmap_output_en)
-    {
-        for (const auto& dir_path : target_dirs) {
-            fs::path dir(dir_path);
-            // Remove existing directory and all contents
-            if (fs::exists(dir)) {
-                try {
-                    uintmax_t removed_count = fs::remove_all(dir);
-                    std::cout << "Removed " << removed_count << " items from " << dir_path << std::endl;
-                } catch (const fs::filesystem_error& e) {
-                    // Handle potential permission errors during deletion
-                    std::cerr << "Failed to remove " << dir_path << ": " << e.what() << std::endl;
-                    continue;
-                }
-            }
-            
-            // Recreate the directory structure
-            try {
-                if (fs::create_directories(dir)) {
-                    std::cout << "Created directory: " << dir_path << std::endl;
-                }
-            } catch (const fs::filesystem_error& e) {
-                // Handle directory creation failures (e.g., permission issues)
-                std::cerr << "Failed to create " << dir_path << ": " << e.what() << std::endl;
-            }
-        }
-    }
-
-    // Ensure all target directories exist regardless of flags
     for (const auto& dir_path : target_dirs) {
         fs::path dir(dir_path);
-        if (!fs::exists(dir)) {
-            try {
-                if (fs::create_directories(dir)) {
-                    std::cout << "Created directory: " << dir_path << std::endl;
-                }
-            } catch (const fs::filesystem_error& e) {
-                // Note: This may fail if parent directories lack write permissions
-                std::cerr << "Failed to create " << dir_path << ": " << e.what() << std::endl;
-            }
+        boost::system::error_code error;
+        fs::create_directories(dir, error);
+        if (error || !fs::is_directory(dir)) {
+            throw std::runtime_error("Failed to create runtime directory " + dir_path + ": " + error.message());
         }
     }
-    if(colmap_output_en) fout_points.open(std::string(ROOT_DIR) + "Log/Colmap/sparse/0/points3D.txt", std::ios::out);
-    if(pcd_save_en) fout_lidar_pos.open(std::string(ROOT_DIR) + "Log/pcd/lidar_poses.txt", std::ios::out);
-    if(img_save_en) fout_visual_pos.open(std::string(ROOT_DIR) + "Log/image/image_poses.txt", std::ios::out);
+    if(colmap_output_en) fout_points.open(fast_livo_runtime::path("Log/Colmap/sparse/0/points3D.txt"), std::ios::out);
+    if(pcd_save_en) fout_lidar_pos.open(fast_livo_runtime::path("Log/pcd/lidar_poses.txt"), std::ios::out);
+    if(img_save_en) fout_visual_pos.open(fast_livo_runtime::path("Log/image/image_poses.txt"), std::ios::out);
     fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"), std::ios::out);
     fout_out.open(DEBUG_FILE_DIR("mat_out.txt"), std::ios::out);
 }
@@ -622,13 +592,13 @@ void LIVMapper::handleLIO()
     std::ofstream outFile, evoFile;
     if (!pos_opend) 
     {
-      evoFile.open(std::string(ROOT_DIR) + "Log/result/" + seq_name + ".txt", std::ios::out);
+      evoFile.open(fast_livo_runtime::path(std::filesystem::path("Log/result") / (seq_name + ".txt")), std::ios::out);
       pos_opend = true;
       if (!evoFile.is_open()) RCLCPP_ERROR(this->node->get_logger(), "open fail\n");
     } 
     else 
     {
-      evoFile.open(std::string(ROOT_DIR) + "Log/result/" + seq_name + ".txt", std::ios::app);
+      evoFile.open(fast_livo_runtime::path(std::filesystem::path("Log/result") / (seq_name + ".txt")), std::ios::app);
       if (!evoFile.is_open()) RCLCPP_ERROR(this->node->get_logger(), "open fail\n");
     }
     Eigen::Matrix4d outT;
@@ -744,8 +714,8 @@ void LIVMapper::savePCD()
 {
   if (pcd_save_en && (pcl_wait_save->points.size() > 0 || pcl_wait_save_intensity->points.size() > 0) && pcd_save_interval < 0) 
   {
-    std::string raw_points_dir = std::string(ROOT_DIR) + "Log/pcd/all_raw_points.pcd";
-    std::string downsampled_points_dir = std::string(ROOT_DIR) + "Log/pcd/all_downsampled_points.pcd";
+    std::string raw_points_dir = fast_livo_runtime::path("Log/pcd/all_raw_points.pcd").string();
+    std::string downsampled_points_dir = fast_livo_runtime::path("Log/pcd/all_downsampled_points.pcd").string();
     pcl::PCDWriter pcd_writer;
 
     if (img_en)
@@ -1517,7 +1487,8 @@ void LIVMapper::publish_frame_world(const rclcpp::Publisher<sensor_msgs::msg::Po
     }
     if ((pcl_wait_save->size() > 0 || pcl_wait_save_intensity->size() > 0) && pcd_save_interval > 0 && scan_wait_num >= pcd_save_interval)
     {
-      string all_points_dir(string(string(ROOT_DIR) + "Log/pcd/") + ss_time.str() + string(".pcd"));
+      string all_points_dir = fast_livo_runtime::path(
+        std::filesystem::path("Log/pcd") / (ss_time.str() + ".pcd")).string();
 
       pcl::PCDWriter pcd_writer;
 
@@ -1550,7 +1521,8 @@ void LIVMapper::publish_frame_world(const rclcpp::Publisher<sensor_msgs::msg::Po
 
     if (img_save_interval > 0 && img_wait_num >= img_save_interval)
     {
-      imwrite(string(string(ROOT_DIR) + "Log/image/") + ss_time.str() + string(".png"), vio_manager->img_rgb);
+      imwrite(fast_livo_runtime::path(
+        std::filesystem::path("Log/image") / (ss_time.str() + ".png")).string(), vio_manager->img_rgb);
       
       Eigen::Quaterniond q(_state.rot_end);
       fout_visual_pos << std::fixed << std::setprecision(6);

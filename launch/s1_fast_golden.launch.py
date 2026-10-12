@@ -115,10 +115,12 @@ def launch_setup(context):
         share, arg("mode"), arg("params_file"), arg("camera_params_file"),
         arg("input_mode"), arg("image_topic"), sim_time,
     )
+    overrides["output_dir"] = arg("output_dir")
     livox = validate_livox_runtime()
     actions = [LogInfo(msg=(
         f"S1 FAST: profiles={paths}, mode={arg('mode')}, input_mode={arg('input_mode')}, "
-        f"image_topic={topic}, use_sim_time={sim_time} (launch argument; "
+        f"image_topic={topic}, output_dir={arg('output_dir') or '<user-state-default>'}, "
+        f"use_sim_time={sim_time} (launch argument; "
         f"{'/clock' if sim_time else 'system clock'}), livox_typesupport={livox}"
     )), Node(package="fast_livo", executable="fastlivo_mapping", name="laserMapping",
              output="screen", parameters=[*paths, overrides])]
@@ -137,6 +139,7 @@ def generate_launch_description():
     defaults = {
         "mode": "livo", "params_file": "", "camera_params_file": "",
         "input_mode": "raw", "image_topic": "", "use_sim_time": "true",
+        "output_dir": "",
         "use_rviz": "true",
         "rviz_config": str(Path(share) / "rviz_cfg" / "fast_livo2_golden.rviz"),
     }

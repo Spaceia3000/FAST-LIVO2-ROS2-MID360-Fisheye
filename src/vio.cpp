@@ -1106,7 +1106,7 @@ void VIOManager::projectPatchFromRefToCur(const unordered_map<VOXEL_LOCATION, Vo
   // if(new_frame_->id_ != 2) return; //124
 
   int patch_size = 25;
-  string dir = string(ROOT_DIR) + "Log/ref_cur_combine/";
+  string dir = fast_livo_runtime::path("Log/ref_cur_combine").string();
 
   cv::Mat result = cv::Mat::zeros(height, width, CV_8UC1);
   cv::Mat result_normal = cv::Mat::zeros(height, width, CV_8UC1);
@@ -1766,7 +1766,8 @@ void VIOManager::dumpDataForColmap()
   std::ostringstream ss;
   ss << std::setw(5) << std::setfill('0') << cnt;
   std::string cnt_str = ss.str();
-  std::string image_path = std::string(ROOT_DIR) + "Log/Colmap/images/" + cnt_str + ".png";
+  std::string image_path = fast_livo_runtime::path(
+    std::filesystem::path("Log/Colmap/images") / (cnt_str + ".png")).string();
   
   cv::Mat img_rgb_undistort;
   if(equidistant_cam) {

@@ -49,6 +49,7 @@ def generate_launch_description():
         default_value='False',
         description='Use simulation clock if true',
     )
+    output_dir_arg = DeclareLaunchArgument('output_dir', default_value='')
 
     avia_params_file = LaunchConfiguration('avia_params_file')
     camera_params_file = LaunchConfiguration('camera_params_file')
@@ -61,6 +62,7 @@ def generate_launch_description():
         camera_config_arg,
         use_respawn_arg,
         use_sim_time_arg,
+        output_dir_arg,
 
         # play ros2 bag
         # ExecuteProcess(
@@ -84,7 +86,7 @@ def generate_launch_description():
                 ("out", "/left_camera/image")
             ],
             parameters=[
-                {"use_sim_time": use_sim_time}
+                {"use_sim_time": use_sim_time, "output_dir": LaunchConfiguration("output_dir")}
             ],
             output="screen",
             respawn=use_respawn,

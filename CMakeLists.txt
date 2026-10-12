@@ -39,9 +39,6 @@ else()
   add_definitions(-DX86_ARCH)
 endif()
 
-# Define project root directory
-add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
-
 # Detect CPU core count for potential multithreading optimization
 include(ProcessorCount)
 ProcessorCount(N)
@@ -91,6 +88,7 @@ find_package(visualization_msgs REQUIRED)
 find_package(pcl_ros REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2 REQUIRED)
 find_package(livox_ros_driver2 REQUIRED)
 find_package(vikit_common REQUIRED)
 find_package(vikit_ros REQUIRED)
@@ -144,6 +142,7 @@ set(dependencies
   pcl_ros
   pcl_conversions
   tf2_ros
+  tf2
   livox_ros_driver2
 )
 
@@ -171,8 +170,8 @@ ament_target_dependencies(laser_mapping ${dependencies})
 # linking libraries or executables to public dependencies
 target_link_libraries(laser_mapping 
     "${cpp_typesupport_target}"
-    ${CMAKE_SOURCE_DIR}/../../install/vikit_common/lib/libvikit_common.so 
-    ${CMAKE_SOURCE_DIR}/../../install/vikit_ros/lib/libvikit_ros.so
+    vikit_common::vikit_common
+    vikit_ros::vikit_ros
     ${COMMON_DEPENDENCIES}
 )
 target_link_libraries(vio ${COMMON_DEPENDENCIES})
@@ -206,10 +205,17 @@ if(mimalloc_FOUND)
   target_link_libraries(fastlivo_mapping mimalloc)
 endif()
 
-# Install the executable
 install(TARGETS
+  vio
+  lio
+  pre
+  imu_proc
+  laser_mapping
+  utils
   fastlivo_mapping
-  DESTINATION lib/${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 install(
@@ -232,7 +238,13 @@ ament_export_dependencies(
   PCL
   OpenCV 
   Sophus
+  Boost
+  fmt
+  vikit_common
+  vikit_ros
 )
+
+ament_export_libraries(vio lio pre imu_proc laser_mapping utils)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
@@ -248,6 +260,15 @@ if(BUILD_TESTING)
       PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     )
+  endif()
+
+  ament_add_gtest(
+    test_runtime_output
+    test/test_runtime_output.cpp
+  )
+
+  if(TARGET test_runtime_output)
+    target_include_directories(test_runtime_output PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
   endif()
 
   ament_add_gtest(

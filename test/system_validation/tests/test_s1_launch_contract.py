@@ -98,6 +98,7 @@ def test_launch_processes_and_parameter_order(launch_module, monkeypatch, rviz):
     assert [(a.package, a.executable) for a in nodes] == [("fast_livo", "fastlivo_mapping")] + ([("rviz2", "rviz2")] if rviz == "true" else [])
     assert nodes[0].parameters[-1]["common.img_en"] == 1
     assert nodes[0].parameters[-1]["use_sim_time"] is True
+    assert nodes[0].parameters[-1]["output_dir"] == ""
     assert "profiles=" in actions[0].msg and "use_sim_time=True" in actions[0].msg
 
 
