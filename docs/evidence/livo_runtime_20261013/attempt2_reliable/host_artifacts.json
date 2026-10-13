@@ -1,0 +1,53 @@
+{
+  "host_path": "/home/breidy/Documents/fast_livo2_worktrees/imu_validation_20261013/livo_regression_reliable_20261013T205131Z",
+  "files": {
+    "frontend.log": {
+      "bytes": 12629725,
+      "sha256": "83a7186a160f8a6c3e0639f60665b9d8ef82b7e42f819e268e911b55e35960d8"
+    },
+    "regression.json": {
+      "bytes": 5769,
+      "sha256": "772fb6dff627e73624f742713a838a75c8a78ac57934683517c5eeb94d33ed88"
+    },
+    "rtabmap.db": {
+      "bytes": 22695936,
+      "sha256": "61d8ed37d687a579b915a49139d1cc4ddbdc2b1cabc036e043c1fe42645350d6"
+    },
+    "camera_storage_bursts.json": {
+      "bytes": 544,
+      "sha256": "4db6a4e3e2e8303af2d8d6b40e2b6579815a06786959c8f7139af00fb72ab141"
+    },
+    "result.json": {
+      "bytes": 75301,
+      "sha256": "cdc49b3fb7c748d1632a58008b40645ad7418af5936213d556ed2a0747e7d700"
+    },
+    "offline_anchor_consistency.json": {
+      "bytes": 20825,
+      "sha256": "3ce1f4c16c8f8929cb135e996fbbf947b053d2c27fdb4503ddfac96945e1a84e"
+    },
+    "odom.csv": {
+      "bytes": 460870,
+      "sha256": "544fc529987e2fa73e6201acc70705312628b46af3dd7ca23db7de91f7fe247e"
+    },
+    "player.log": {
+      "bytes": 657,
+      "sha256": "3cf305bb6d07e7fee2f222481269b2fa953d47de8f4ff86af8cd56bbb55ae461"
+    },
+    "native_runtime_bindings.json": {
+      "bytes": 1907,
+      "sha256": "0a68bcae2349e5b0b8ef2c30825ce7891c1b0a2ccccbb1202519dbf797e8732d"
+    },
+    "final_mapgraph.cdr": {
+      "bytes": 65308,
+      "sha256": "d10eac73c3212cd8b3a8921b467c34389c7d144ff9fa8b91fa37e1afa93893e2"
+    },
+    "final_dense.cdr": {
+      "bytes": 213868,
+      "sha256": "267d4b6c366f04da1d375b78f91ed68014c0448419bb15308fe183de312355ba"
+    },
+    "backend.log": {
+      "bytes": 72391,
+      "sha256": "ea51d56702434cc7fddbf5667e077548e91423d7048e561aa8154e24f52de776"
+    }
+  }
+}

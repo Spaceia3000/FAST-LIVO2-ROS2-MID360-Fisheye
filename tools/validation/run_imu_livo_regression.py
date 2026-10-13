@@ -32,7 +32,7 @@ def main():
     if occupied: raise RuntimeError('Domain occupied: '+str(occupied))
     harness=args.project_source/'tools/validation/validate_split_launches_host.py'
     base=load(harness,'split_validation')
-    from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+    from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
     from rosbag2_interfaces.srv import Resume
     from rosgraph_msgs.msg import Clock
     from sensor_msgs.msg import Image, Imu, PointCloud2
@@ -42,6 +42,7 @@ def main():
     from rclpy.serialization import serialize_message
     case=base.Case(args.output,dict(os.environ))
     qos=QoSProfile(depth=100,reliability=ReliabilityPolicy.RELIABLE,durability=DurabilityPolicy.VOLATILE)
+    audit_qos=QoSProfile(history=HistoryPolicy.KEEP_ALL,reliability=ReliabilityPolicy.RELIABLE,durability=DurabilityPolicy.VOLATILE)
     clock_qos=QoSProfile(depth=10,reliability=ReliabilityPolicy.BEST_EFFORT,durability=DurabilityPolicy.VOLATILE)
     counts={};first={};last={};bad_odom=0;bad_metric_clouds=0;metric_points=0;rgb_nonempty=0;rgb_valid=0;image_nonempty=0
     rgb_colors=set();latest_graph=None;latest_dense=None;odom_seen=set();odom_sequence=[];frames={};duplicates=0;backwards=0;prev=None
@@ -53,7 +54,13 @@ def main():
         t=stamp(msg) if hasattr(msg,'header') else int(msg.clock.sec)*1000000000+int(msg.clock.nanosec)
         first.setdefault(topic,t);last[topic]=t
         if hasattr(msg,'header'):frames.setdefault(topic,set()).add(msg.header.frame_id)
-    def input_cb(topic): return lambda msg:seen(topic,msg)
+    input_rows=(args.output/'input_stamps.csv').open('w')
+    input_writer=csv.writer(input_rows);input_writer.writerow(['topic','stamp_ns','receipt_monotonic_ns'])
+    def input_cb(topic):
+        def receive(msg):
+            seen(topic,msg)
+            if topic!='/clock':input_writer.writerow([topic,stamp(msg),time.monotonic_ns()])
+        return receive
     def finite_pose(p):
         return all(math.isfinite(x) for x in (p.position.x,p.position.y,p.position.z,p.orientation.x,p.orientation.y,p.orientation.z,p.orientation.w))
     def odom(msg):
@@ -99,9 +106,9 @@ def main():
         nonlocal latest_graph
         seen('/rtabmap/mapGraph',msg);latest_graph=msg
     inputs={'/livox/lidar':(CustomMsg,1899),'/livox/imu':(Imu,37984),'/camera/camera/color/image_raw':(Image,4502)}
-    subscriptions=[case.node.create_subscription(typ,t,input_cb(t),qos) for t,(typ,_) in inputs.items()]
+    subscriptions=[case.node.create_subscription(typ,t,input_cb(t),audit_qos) for t,(typ,_) in inputs.items()]
     subscriptions += [
-        case.node.create_subscription(Odometry,'/aft_mapped_to_init',odom,qos),
+        case.node.create_subscription(Odometry,'/aft_mapped_to_init',odom,audit_qos),
         case.node.create_subscription(PointCloud2,'/cloud_registered',rgb,qos),
         case.node.create_subscription(PointCloud2,'/cloud_registered_metric',metric,qos),
         case.node.create_subscription(Image,'/rgb_img',image,qos),
@@ -110,7 +117,7 @@ def main():
         case.node.create_subscription(Clock,'/clock',input_cb('/clock'),clock_qos)]
     outcome={'passed':False,'scope':'full UGV10 LIVO publication/finite-state regression; no GT or causal closure-accuracy claim',
              'source_commit':'b8075486fa8fef16254a30b1671df9cf146cce32','frontend_prefix':get_package_prefix('fast_livo'),'backend_prefix':get_package_prefix('fast_livo2_rtabmap_core'),'profile_sha256':hashlib.sha256((source/'config/ugv_v1_livo.yaml').read_bytes()).hexdigest(),'script_sha256':hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest(),'harness_sha256':hashlib.sha256(harness.read_bytes()).hexdigest(),
-             'input_camera_ends_before_lidar_s':39.700727824,'input_capture_qos':'RELIABLE depth100; exact receipt counts are a gate; clock BEST_EFFORT depth10'}
+             'input_camera_ends_before_lidar_s':39.700727824,'input_capture_qos':'Raw inputs and odometry RELIABLE KEEP_ALL VOLATILE; other outputs RELIABLE KEEP_LAST100; clock BEST_EFFORT KEEP_LAST10', 'player_transport_override':'Raw topics RELIABLE KEEP_ALL VOLATILE; wait-for-all-acked10000ms; rate0.5 unchanged'}
     started=time.monotonic()
     try:
         case.start('frontend',['ros2','launch','fast_livo','s1_fast_golden.launch.py','mode:=livo','use_rviz:=false','use_sim_time:=true'])
@@ -121,8 +128,10 @@ def main():
         actual_imus={path for paths in case.result['loaded_paths'].values() for path in paths if pathlib.Path(path).name=='libimu_proc.so'}
         if actual_imus!={str(expected_imu)}:raise RuntimeError('Wrong loaded IMU library: '+str(actual_imus))
         outcome['loaded_imu_library']={'path':str(expected_imu),'sha256':hashlib.sha256(expected_imu.read_bytes()).hexdigest()}
+        override=args.output/'player_qos.yaml'
+        override.write_text(''.join(t+':\n  reliability: reliable\n  history: keep_all\n  durability: volatile\n' for t in inputs))
         player=case.start('player',['ros2','bag','play','/home/breidy/Documents/datasets/ugv_fast_livo2/ugv_custom_fastlivo2_10',
-            '--rate','0.5','--clock','40','--start-paused','--disable-keyboard-controls','--topics',*inputs])
+            '--qos-profile-overrides-path',str(override),'--wait-for-all-acked','10000','--rate','0.5','--clock','40','--start-paused','--disable-keyboard-controls','--topics',*inputs])
         end=time.monotonic()+45;ready=False;endpoints={}
         while time.monotonic()<end:
             case.spin(.2)
@@ -132,9 +141,11 @@ def main():
             if ready:break
         outcome['input_endpoints_before_resume']=endpoints
         observed_topics=[*inputs,'/aft_mapped_to_init','/cloud_registered','/cloud_registered_metric','/rgb_img','/rtabmap/mapGraph','/fast_livo2_rtabmap/trajectory_dense']
-        offered={t:[{'name':x.node_name,'reliability':int(x.qos_profile.reliability),'durability':int(x.qos_profile.durability),'depth':x.qos_profile.depth} for x in case.node.get_publishers_info_by_topic(t)] for t in observed_topics}
+        offered={t:[{'name':x.node_name,'reliability':int(x.qos_profile.reliability),'durability':int(x.qos_profile.durability),'depth':x.qos_profile.depth,'history':int(x.qos_profile.history)} for x in case.node.get_publishers_info_by_topic(t)] for t in observed_topics}
         outcome['offered_qos_before_resume']=offered
         if any(not records or any(x['reliability']!=int(ReliabilityPolicy.RELIABLE) for x in records) for records in offered.values()):raise RuntimeError('Reliable probe requires reliable offered publishers')
+        for topic in inputs:
+            if any(x['history']!=int(HistoryPolicy.KEEP_ALL) or x['durability']!=int(DurabilityPolicy.VOLATILE) for x in offered[topic]):raise RuntimeError('Raw override QoS not applied: '+topic)
         if not ready:raise RuntimeError('Native sensor endpoint matching timeout')
         clock=case.node.get_publishers_info_by_topic('/clock');outcome['clock_publishers_before_resume']=[x.node_name for x in clock]
         if len(clock)!=1 or clock[0].node_name!='rosbag2_player':raise RuntimeError('Clock source must be unique player')
@@ -157,7 +168,7 @@ def main():
                 for proc in pathlib.Path('/proc').iterdir():
                     if not proc.name.isdigit():continue
                     try:
-                        if os.getpgid(int(proc.name)) in groups:
+                        if int(proc.name)==os.getpid() or os.getpgid(int(proc.name)) in groups:
                             for line in (proc/'status').read_text().splitlines():
                                 if line.startswith('VmRSS:'):rss+=int(line.split()[1])*1024
                     except (FileNotFoundError,ProcessLookupError,PermissionError):pass
@@ -212,7 +223,7 @@ def main():
         outcome['passed']=True
     except Exception:outcome['error']=traceback.format_exc()
     finally:
-        rows.close()
+        rows.close();input_rows.close()
         try:
             if latest_dense is not None:
                 (args.output/'final_dense.cdr').write_bytes(serialize_message(latest_dense))
