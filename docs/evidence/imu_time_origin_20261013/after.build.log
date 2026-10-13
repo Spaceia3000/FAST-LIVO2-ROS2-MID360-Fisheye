@@ -1,0 +1,12 @@
+[ 12%] Building CXX object gtest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o
+[ 25%] Building CXX object CMakeFiles/imu_proc.dir/src/IMU_Processing.cpp.o
+[ 37%] Linking CXX static library libgtest_main.a
+[ 37%] Built target gtest_main
+[ 50%] Building CXX object gtest/CMakeFiles/gtest.dir/src/gtest-all.cc.o
+[ 62%] Linking CXX static library libgtest.a
+[ 62%] Built target gtest
+[ 75%] Linking CXX shared library libimu_proc.so
+[ 75%] Built target imu_proc
+[ 87%] Building CXX object CMakeFiles/test_imu_initialization_time_origin.dir/test/test_imu_initialization_time_origin.cpp.o
+[100%] Linking CXX executable test_imu_initialization_time_origin
+[100%] Built target test_imu_initialization_time_origin
