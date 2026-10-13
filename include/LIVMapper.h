@@ -24,6 +24,7 @@ which is included as part of this source code package.
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <vikit/camera_loader.h>
+#include <chrono>
 
 class LIVMapper
 {
@@ -41,6 +42,7 @@ public:
   void handleLIO();
   void savePCD();
   void processImu();
+  void logIngestDiagnostics();
   
   bool sync_packages(LidarMeasureGroup &meas);
   void prop_imu_once(StatesGroup &imu_prop_state, const double dt, V3D acc_avr, V3D angvel_avr);
@@ -207,6 +209,12 @@ public:
   double aver_time_map_inre = 0;
   bool colmap_output_en = false;
   bool enable_image_processing = false; 
+  int ingest_spin_budget_ms = 0;
+  bool ingest_diagnostics_enabled = false;
+  std::chrono::steady_clock::time_point last_imu_reception_time;
+  std::chrono::steady_clock::time_point last_lidar_reception_time;
+  std::chrono::steady_clock::time_point last_img_reception_time;
+  std::chrono::steady_clock::time_point last_ingest_diagnostics_log_time;
   // JPEG decoding callback function
   void jpeg_callback(const sensor_msgs::msg::CompressedImage::SharedPtr msg);
 };

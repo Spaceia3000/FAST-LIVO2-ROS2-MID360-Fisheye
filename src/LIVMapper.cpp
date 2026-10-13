@@ -13,6 +13,8 @@ which is included as part of this source code package.
 #include "LIVMapper.h"
 #include <vikit/camera_loader.h>
 #include <boost/filesystem.hpp>
+#include <limits>
+#include <rclcpp/executors/single_threaded_executor.hpp>
 
 using namespace Sophus;
 LIVMapper::LIVMapper(std::string node_name, const rclcpp::NodeOptions & options)
@@ -135,6 +137,8 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   try_declare.template operator()<vector<double>>("extrin_calib.Rcl", vector<double>{});
   try_declare.template operator()<double>("debug.plot_time", -10);
   try_declare.template operator()<int>("debug.frame_cnt", 6);
+  try_declare.template operator()<int>("runtime.ingest_spin_budget_ms", 0);
+  try_declare.template operator()<bool>("diagnostics.ingest.enabled", false);
 
   try_declare.template operator()<double>("publish.blind_rgb_points", 0.01);
   try_declare.template operator()<int>("publish.pub_scan_num", 1);
@@ -211,6 +215,12 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   this->node->get_parameter("extrin_calib.Rcl", cameraextrinR);
   this->node->get_parameter("debug.plot_time", plot_time);
   this->node->get_parameter("debug.frame_cnt", frame_cnt);
+  this->node->get_parameter("runtime.ingest_spin_budget_ms", ingest_spin_budget_ms);
+  if (ingest_spin_budget_ms < 0 || ingest_spin_budget_ms > 50)
+  {
+    throw std::invalid_argument("runtime.ingest_spin_budget_ms must be in [0, 50]");
+  }
+  this->node->get_parameter("diagnostics.ingest.enabled", ingest_diagnostics_enabled);
 
   this->node->get_parameter("publish.blind_rgb_points", blind_rgb_points);
   this->node->get_parameter("publish.pub_scan_num", pub_scan_num);
@@ -442,6 +452,9 @@ void LIVMapper::jpeg_callback(const sensor_msgs::msg::CompressedImage::SharedPtr
         img_buffer.push_back(image);
         img_time_buffer.push_back(msg_header_time);
         last_timestamp_img = msg_header_time;
+        if (ingest_diagnostics_enabled) {
+            last_img_reception_time = std::chrono::steady_clock::now();
+        }
         mtx_buffer.unlock();
         // Notify processing thread
         sig_buffer.notify_all();
@@ -793,23 +806,118 @@ void LIVMapper::savePCD()
 void LIVMapper::run()
 {
   rclcpp::Rate rate(5000);
-  while (rclcpp::ok()) 
+  std::unique_ptr<rclcpp::executors::SingleThreadedExecutor> ingest_executor;
+  if (ingest_spin_budget_ms > 0)
   {
-    rclcpp::spin_some(this->node);
-    if (!sync_packages(LidarMeasures)) 
+    // Opt-in starvation experiment: keep every callback serial on the mapping thread.
+    ingest_executor = std::make_unique<rclcpp::executors::SingleThreadedExecutor>();
+    ingest_executor->add_node(this->node);
+  }
+
+  try
+  {
+    while (rclcpp::ok())
     {
-      rate.sleep();
-      continue;
+      if (ingest_executor)
+      {
+        ingest_executor->spin_all(std::chrono::milliseconds(ingest_spin_budget_ms));
+      }
+      else
+      {
+        rclcpp::spin_some(this->node);
+      }
+      logIngestDiagnostics();
+      if (!sync_packages(LidarMeasures))
+      {
+        rate.sleep();
+        continue;
+      }
+      handleFirstFrame();
+
+      processImu();
+
+      // if (!p_imu->imu_time_init) continue;
+
+      stateEstimationAndMapping();
     }
-    handleFirstFrame();
-
-    processImu();
-
-    // if (!p_imu->imu_time_init) continue;
-
-    stateEstimationAndMapping();
+  }
+  catch (...)
+  {
+    if (ingest_executor)
+    {
+      ingest_executor->remove_node(this->node);
+    }
+    throw;
+  }
+  if (ingest_executor)
+  {
+    ingest_executor->remove_node(this->node);
   }
   savePCD();
+}
+
+void LIVMapper::logIngestDiagnostics()
+{
+  if (!ingest_diagnostics_enabled) return;
+
+  const auto steady_now = std::chrono::steady_clock::now();
+  if (last_ingest_diagnostics_log_time.time_since_epoch().count() != 0 &&
+      steady_now - last_ingest_diagnostics_log_time < std::chrono::seconds(1))
+  {
+    return;
+  }
+  last_ingest_diagnostics_log_time = steady_now;
+
+  double imu_stamp;
+  double lidar_stamp;
+  double img_stamp;
+  std::size_t imu_queue_size;
+  std::size_t lidar_queue_size;
+  std::size_t img_queue_size;
+  std::chrono::steady_clock::time_point imu_reception_time;
+  std::chrono::steady_clock::time_point lidar_reception_time;
+  std::chrono::steady_clock::time_point img_reception_time;
+  {
+    std::lock_guard<std::mutex> lock(mtx_buffer);
+    imu_stamp = last_timestamp_imu;
+    lidar_stamp = last_timestamp_lidar;
+    img_stamp = last_timestamp_img;
+    imu_queue_size = imu_buffer.size();
+    lidar_queue_size = lid_raw_data_buffer.size();
+    img_queue_size = img_buffer.size();
+    imu_reception_time = last_imu_reception_time;
+    lidar_reception_time = last_lidar_reception_time;
+    img_reception_time = last_img_reception_time;
+  }
+
+  const double missing = std::numeric_limits<double>::quiet_NaN();
+  const double wall_now = std::chrono::duration<double>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
+  const auto stamp_age = [wall_now, missing](double stamp) {
+    return stamp >= 0.0 ? wall_now - stamp : missing;
+  };
+  const auto reception_idle_age = [steady_now, missing](
+      const std::chrono::steady_clock::time_point & reception_time) {
+    return reception_time.time_since_epoch().count() != 0
+        ? std::chrono::duration<double>(steady_now - reception_time).count()
+        : missing;
+  };
+  const double estimator_stamp = LidarMeasures.last_lio_update_time;
+
+  RCLCPP_INFO(
+      node->get_logger(),
+      "[ingest] wall_stamp_age_s imu=%.3f lidar=%.3f camera=%.3f; "
+      "callback_idle_s imu=%.3f lidar=%.3f camera=%.3f; "
+      "stamp_s imu=%.6f lidar=%.6f camera=%.6f; "
+      "queue_size imu=%zu lidar=%zu camera=%zu; "
+      "estimator_stamp_s=%.6f estimator_wall_age_s=%.3f",
+      stamp_age(imu_stamp), stamp_age(lidar_stamp), stamp_age(img_stamp),
+      reception_idle_age(imu_reception_time),
+      reception_idle_age(lidar_reception_time),
+      reception_idle_age(img_reception_time),
+      imu_stamp, lidar_stamp, img_stamp,
+      imu_queue_size, lidar_queue_size, img_queue_size,
+      estimator_stamp, stamp_age(estimator_stamp));
 }
 
 void LIVMapper::prop_imu_once(StatesGroup &imu_prop_state, const double dt, V3D acc_avr, V3D angvel_avr)
@@ -980,6 +1088,9 @@ void LIVMapper::standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::ConstShare
   lid_header_time_buffer.push_back(cur_head_time);
   lid_frame_id_buffer.push_back(msg->header.frame_id);
   last_timestamp_lidar = cur_head_time;
+  if (ingest_diagnostics_enabled) {
+    last_lidar_reception_time = std::chrono::steady_clock::now();
+  }
 
   mtx_buffer.unlock();
   sig_buffer.notify_all();
@@ -1021,6 +1132,9 @@ void LIVMapper::livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::ConstShar
   lid_header_time_buffer.push_back(cur_head_time);
   lid_frame_id_buffer.push_back(msg->header.frame_id);
   last_timestamp_lidar = cur_head_time;
+  if (ingest_diagnostics_enabled) {
+    last_lidar_reception_time = std::chrono::steady_clock::now();
+  }
 
   mtx_buffer.unlock();
   sig_buffer.notify_all();
@@ -1065,6 +1179,9 @@ void LIVMapper::imu_cbk(const sensor_msgs::msg::Imu::ConstSharedPtr &msg_in)
   last_timestamp_imu = timestamp;
 
   imu_buffer.push_back(msg);
+  if (ingest_diagnostics_enabled) {
+    last_imu_reception_time = std::chrono::steady_clock::now();
+  }
 //   cout<<"got imu: "<<timestamp<<" imu size "<<imu_buffer.size()<<endl;
   mtx_buffer.unlock();
   if (imu_prop_enable)
@@ -1123,6 +1240,9 @@ void LIVMapper::img_cbk(const sensor_msgs::msg::Image::ConstSharedPtr &msg_in)
   // ROS_INFO("Correct Image time: %.6f", img_time_correct);
 
   last_timestamp_img = img_time_correct;
+  if (ingest_diagnostics_enabled) {
+    last_img_reception_time = std::chrono::steady_clock::now();
+  }
   // cv::imshow("img", img);
   // cv::waitKey(1);
   // cout<<"last_timestamp_img:::"<<last_timestamp_img<<endl;

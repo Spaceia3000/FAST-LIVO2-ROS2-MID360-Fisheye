@@ -105,21 +105,36 @@ def parse_bool(value):
     return value.lower() == "true"
 
 
+def parse_ingest_spin_budget_ms(value):
+    if not re.fullmatch(r"\d+", value):
+        raise RuntimeError(f"ingest_spin_budget_ms must be an integer from 0 to 50, got {value!r}")
+    budget = int(value)
+    if budget > 50:
+        raise RuntimeError(f"ingest_spin_budget_ms must be an integer from 0 to 50, got {value!r}")
+    return budget
+
+
 def launch_setup(context):
     def arg(name):
         return LaunchConfiguration(name).perform(context)
     share = get_package_share_directory("fast_livo")
     sim_time = parse_bool(arg("use_sim_time"))
     use_rviz = parse_bool(arg("use_rviz"))
+    ingest_spin_budget_ms = parse_ingest_spin_budget_ms(arg("ingest_spin_budget_ms"))
+    ingest_diagnostics = parse_bool(arg("ingest_diagnostics"))
     paths, overrides, topic = resolve_contract(
         share, arg("mode"), arg("params_file"), arg("camera_params_file"),
         arg("input_mode"), arg("image_topic"), sim_time,
     )
+    overrides["runtime.ingest_spin_budget_ms"] = ingest_spin_budget_ms
+    overrides["diagnostics.ingest.enabled"] = ingest_diagnostics
     livox = validate_livox_runtime()
     actions = [LogInfo(msg=(
         f"S1 FAST: profiles={paths}, mode={arg('mode')}, input_mode={arg('input_mode')}, "
         f"image_topic={topic}, use_sim_time={sim_time} (launch argument; "
-        f"{'/clock' if sim_time else 'system clock'}), livox_typesupport={livox}"
+        f"{'/clock' if sim_time else 'system clock'}), "
+        f"ingest_spin_budget_ms={ingest_spin_budget_ms}, ingest_diagnostics={ingest_diagnostics}, "
+        f"livox_typesupport={livox}"
     )), Node(package="fast_livo", executable="fastlivo_mapping", name="laserMapping",
              output="screen", parameters=[*paths, overrides])]
     if use_rviz:
@@ -137,7 +152,7 @@ def generate_launch_description():
     defaults = {
         "mode": "livo", "params_file": "", "camera_params_file": "",
         "input_mode": "raw", "image_topic": "", "use_sim_time": "true",
-        "use_rviz": "true",
+        "use_rviz": "true", "ingest_spin_budget_ms": "0", "ingest_diagnostics": "false",
         "rviz_config": str(Path(share) / "rviz_cfg" / "fast_livo2_golden.rviz"),
     }
     return LaunchDescription([
