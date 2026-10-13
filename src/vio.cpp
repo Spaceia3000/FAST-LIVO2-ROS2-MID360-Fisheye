@@ -352,6 +352,11 @@ double VIOManager::calculateNCC(float *ref_patch, float *cur_patch, int patch_si
 
 void VIOManager::retrieveFromVisualSparseMap(cv::Mat img, vector<pointWithVar> &pg, const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &plane_map)
 {
+  if (diagnostics_enabled)
+  {
+    diagnostics_candidates_direct = 0;
+    diagnostics_candidates_raycast = 0;
+  }
   if (feat_map.size() <= 0) return;
   double ts0 = omp_get_wtime();
 
@@ -455,6 +460,7 @@ void VIOManager::retrieveFromVisualSparseMap(cv::Mat img, vector<pointWithVar> &
       bool voxel_in_fov = false;
       std::vector<VisualPoint *> &voxel_points = corre_voxel->second->voxel_points;
       int voxel_num = voxel_points.size();
+      if (diagnostics_enabled) diagnostics_candidates_direct += voxel_points.size();
 
       for (int i = 0; i < voxel_num; i++)
       {
@@ -528,6 +534,7 @@ void VIOManager::retrieveFromVisualSparseMap(cv::Mat img, vector<pointWithVar> &
 
           std::vector<VisualPoint *> &voxel_points = corre_feat_map->second->voxel_points;
           int voxel_num = voxel_points.size();
+          if (diagnostics_enabled) diagnostics_candidates_raycast += voxel_points.size();
           if (voxel_num == 0) continue;
 
           for (int j = 0; j < voxel_num; j++)
@@ -1794,7 +1801,7 @@ void VIOManager::dumpDataForColmap()
   cnt++;
 }
 
-void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &feat_map, double img_time)
+void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &geometric_map, double img_time)
 {
   if (width != img.cols || height != img.rows)
   {
@@ -1814,9 +1821,11 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
 
   double t1 = omp_get_wtime();
 
-  retrieveFromVisualSparseMap(img, pg, feat_map);
+  retrieveFromVisualSparseMap(img, pg, geometric_map);
 
   double t2 = omp_get_wtime();
+
+  if (diagnostics_enabled) diagnostics_retrieve_last_ms = (t2 - t1) * 1000.0;
 
   computeJacobianAndUpdateEKF(img);
 
@@ -1828,7 +1837,7 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
   
   plotTrackedPoints();
 
-  if (plot_flag) projectPatchFromRefToCur(feat_map);
+  if (plot_flag) projectPatchFromRefToCur(geometric_map);
 
   double t5 = omp_get_wtime();
 
@@ -1836,7 +1845,7 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
 
   double t6 = omp_get_wtime();
 
-  updateReferencePatch(feat_map);
+  updateReferencePatch(geometric_map);
 
   double t7 = omp_get_wtime();
   
@@ -1845,7 +1854,7 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
   frame_count++;
   ave_total = ave_total * (frame_count - 1) / frame_count + (t7 - t1 - (t5 - t4)) / frame_count;
 
-  // printf("[ VIO ] feat_map.size(): %zu\n", feat_map.size());
+  // printf("[ VIO ] geometric_map.size(): %zu\n", geometric_map.size());
   // printf("\033[1;32m[ VIO time ]: current frame: retrieveFromVisualSparseMap time: %.6lf secs.\033[0m\n", t2 - t1);
   // printf("\033[1;32m[ VIO time ]: current frame: computeJacobianAndUpdateEKF time: %.6lf secs, comp H: %.6lf secs, ekf: %.6lf secs.\033[0m\n", t3 - t2, computeH, ekf_time);
   // printf("\033[1;32m[ VIO time ]: current frame: generateVisualMapPoints time: %.6lf secs.\033[0m\n", t4 - t3);
@@ -1862,7 +1871,7 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
   printf("\033[1;34m+-------------------------------------------------------------+\033[0m\n");
   printf("\033[1;34m|                         VIO Time                            |\033[0m\n");
   printf("\033[1;34m+-------------------------------------------------------------+\033[0m\n");
-  printf("\033[1;34m| %-29s | %-27zu |\033[0m\n", "Sparse Map Size", feat_map.size());
+  printf("\033[1;34m| %-29s | %-27zu |\033[0m\n", "Geometric Map Size", geometric_map.size());
   printf("\033[1;34m+-------------------------------------------------------------+\033[0m\n");
   printf("\033[1;34m| %-29s | %-27s |\033[0m\n", "Algorithm Stage", "Time (secs)");
   printf("\033[1;34m+-------------------------------------------------------------+\033[0m\n");
@@ -1884,4 +1893,19 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
   // origin.y = 20;
   // cv::putText(img_cp, text, origin, cv::FONT_HERSHEY_COMPLEX, 0.6, cv::Scalar(255, 255, 255), 1, 8, 0);
   // cv::imwrite("/home/chunran/Desktop/raycasting/" + std::to_string(new_frame_->id_) + ".png", img_cp);
+}
+
+VioDiagnosticsSnapshot VIOManager::diagnosticsSnapshot(std::size_t geometric_voxels) const
+{
+  VioDiagnosticsSnapshot snapshot;
+  snapshot.visual_voxels = this->feat_map.size();
+  for (const auto &voxel : this->feat_map)
+  {
+    if (voxel.second != nullptr) snapshot.visual_points += voxel.second->voxel_points.size();
+  }
+  snapshot.geometric_voxels = geometric_voxels;
+  snapshot.retrieve_last_ms = diagnostics_retrieve_last_ms;
+  snapshot.candidates_direct = diagnostics_candidates_direct;
+  snapshot.candidates_raycast = diagnostics_candidates_raycast;
+  return snapshot;
 }

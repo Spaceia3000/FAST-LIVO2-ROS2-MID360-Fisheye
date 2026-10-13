@@ -46,6 +46,7 @@ LIVMapper::LIVMapper(std::string node_name, const rclcpp::NodeOptions & options)
   pcl_wait_save_intensity.reset(new PointCloudXYZI());
   voxelmap_manager.reset(new VoxelMapManager(voxel_config, voxel_map));
   vio_manager.reset(new VIOManager());
+  vio_manager->diagnostics_enabled = ingest_diagnostics_enabled;
   root_dir = ROOT_DIR;
   initializeFiles();
   initializeComponents(this->node);          // initialize components errors
@@ -946,6 +947,10 @@ void LIVMapper::logIngestDiagnostics()
       static_cast<unsigned long long>(camera_accepted_count_snapshot),
       static_cast<unsigned long long>(camera_skipped_count_snapshot),
       estimator_stamp, stamp_age(estimator_stamp));
+
+  const auto vio_diagnostics = formatVioDiagnostics(
+      vio_manager->diagnosticsSnapshot(voxelmap_manager->voxel_map_.size()));
+  RCLCPP_INFO(node->get_logger(), "%s", vio_diagnostics.c_str());
 }
 
 void LIVMapper::prop_imu_once(StatesGroup &imu_prop_state, const double dt, V3D acc_avr, V3D angvel_avr)
