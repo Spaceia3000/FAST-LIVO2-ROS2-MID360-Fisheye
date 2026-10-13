@@ -41,7 +41,8 @@ def main():
     from rtabmap_msgs.msg import MapGraph
     from rclpy.serialization import serialize_message
     case=base.Case(args.output,dict(os.environ))
-    qos=QoSProfile(depth=100,reliability=ReliabilityPolicy.BEST_EFFORT,durability=DurabilityPolicy.VOLATILE)
+    qos=QoSProfile(depth=100,reliability=ReliabilityPolicy.RELIABLE,durability=DurabilityPolicy.VOLATILE)
+    clock_qos=QoSProfile(depth=10,reliability=ReliabilityPolicy.BEST_EFFORT,durability=DurabilityPolicy.VOLATILE)
     counts={};first={};last={};bad_odom=0;bad_metric_clouds=0;metric_points=0;rgb_nonempty=0;rgb_valid=0;image_nonempty=0
     rgb_colors=set();latest_graph=None;latest_dense=None;odom_seen=set();odom_sequence=[];frames={};duplicates=0;backwards=0;prev=None
     rows=(args.output/'odom.csv').open('w');writer=csv.writer(rows)
@@ -106,10 +107,10 @@ def main():
         case.node.create_subscription(Image,'/rgb_img',image,qos),
         case.node.create_subscription(Path,'/fast_livo2_rtabmap/trajectory_dense',dense,qos),
         case.node.create_subscription(MapGraph,'/rtabmap/mapGraph',graph,qos),
-        case.node.create_subscription(Clock,'/clock',input_cb('/clock'),qos)]
+        case.node.create_subscription(Clock,'/clock',input_cb('/clock'),clock_qos)]
     outcome={'passed':False,'scope':'full UGV10 LIVO publication/finite-state regression; no GT or causal closure-accuracy claim',
              'source_commit':'b8075486fa8fef16254a30b1671df9cf146cce32','frontend_prefix':get_package_prefix('fast_livo'),'backend_prefix':get_package_prefix('fast_livo2_rtabmap_core'),'profile_sha256':hashlib.sha256((source/'config/ugv_v1_livo.yaml').read_bytes()).hexdigest(),'script_sha256':hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest(),'harness_sha256':hashlib.sha256(harness.read_bytes()).hexdigest(),
-             'input_camera_ends_before_lidar_s':39.700727824,'input_capture_qos':'BEST_EFFORT depth100; exact receipt counts are a gate'}
+             'input_camera_ends_before_lidar_s':39.700727824,'input_capture_qos':'RELIABLE depth100; exact receipt counts are a gate; clock BEST_EFFORT depth10'}
     started=time.monotonic()
     try:
         case.start('frontend',['ros2','launch','fast_livo','s1_fast_golden.launch.py','mode:=livo','use_rviz:=false','use_sim_time:=true'])
@@ -130,6 +131,10 @@ def main():
             ready=all('rosbag2_player' in e['publishers'] and 'laserMapping' in e['subscribers'] and 'modular_supervisor_probe' in e['subscribers'] for e in endpoints.values())
             if ready:break
         outcome['input_endpoints_before_resume']=endpoints
+        observed_topics=[*inputs,'/aft_mapped_to_init','/cloud_registered','/cloud_registered_metric','/rgb_img','/rtabmap/mapGraph','/fast_livo2_rtabmap/trajectory_dense']
+        offered={t:[{'name':x.node_name,'reliability':int(x.qos_profile.reliability),'durability':int(x.qos_profile.durability),'depth':x.qos_profile.depth} for x in case.node.get_publishers_info_by_topic(t)] for t in observed_topics}
+        outcome['offered_qos_before_resume']=offered
+        if any(not records or any(x['reliability']!=int(ReliabilityPolicy.RELIABLE) for x in records) for records in offered.values()):raise RuntimeError('Reliable probe requires reliable offered publishers')
         if not ready:raise RuntimeError('Native sensor endpoint matching timeout')
         clock=case.node.get_publishers_info_by_topic('/clock');outcome['clock_publishers_before_resume']=[x.node_name for x in clock]
         if len(clock)!=1 or clock[0].node_name!='rosbag2_player':raise RuntimeError('Clock source must be unique player')

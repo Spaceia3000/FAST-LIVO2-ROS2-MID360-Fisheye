@@ -16,7 +16,7 @@ mkdir -p "$TASK_RELEASE"
 source "$TASK_WS/install/setup.bash"
 export CMAKE_BUILD_PARALLEL_LEVEL=2
 export MAKEFLAGS=-j2
-colcon --log-base "$TASK_RELEASE/log" build --base-paths "$TASK_SOURCE" --packages-select fast_livo --symlink-install --build-base "$TASK_RELEASE/build" --install-base "$TASK_RELEASE/install" --executor sequential --cmake-args -DBUILD_TESTING=OFF -Dvikit_common_DIR=/home/breidy/Documents/ham_slam_ws/install/vikit_common/share/vikit_common/cmake -Dvikit_ros_DIR=/home/breidy/Documents/ham_slam_ws/install/vikit_ros/share/vikit_ros/cmake > "$TASK_RELEASE/build.log" 2>&1
+colcon --log-base "$TASK_RELEASE/log" build --base-paths "$TASK_SOURCE" --packages-select fast_livo --symlink-install --build-base "$TASK_RELEASE/build" --install-base "$TASK_RELEASE/install" --executor sequential --cmake-args -DBUILD_TESTING=OFF -Dvikit_common_DIR=/home/breidy/Documents/fast_livo2_baseline_ws/install/vikit_common/share/vikit_common/cmake -Dvikit_ros_DIR=/home/breidy/Documents/fast_livo2_baseline_ws/install/vikit_ros/share/vikit_ros/cmake > "$TASK_RELEASE/build.log" 2>&1
 test "$(git -C "$TASK_SOURCE" rev-parse HEAD)" = "$TASK_SHA"
 git -C "$TASK_SOURCE" diff --quiet
 git -C "$TASK_SOURCE" diff --cached --quiet
