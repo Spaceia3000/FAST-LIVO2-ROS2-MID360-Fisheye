@@ -202,7 +202,8 @@ def main():
         anchors={'graph_poses':len(graph_snapshot['optimized_poses']),'matched':len(errors),'unmatched_ids':unmatched,'max_translation_m':maximum,'max_rotation_deg':maximum_rotation,'anchors':errors,'scope':'Internal optimized graph/dense consistency, not GT accuracy; GetMap2 has no remote epoch.'}
         (args.output/'anchor_consistency.json').write_text(json.dumps(anchors,indent=2)+'\n')
         outcome['anchor_consistency']={k:v for k,v in anchors.items() if k!='anchors'}
-        if unmatched or not errors or maximum>0.001 or maximum_rotation>0.01:raise RuntimeError('Graph/dense internal numerical consistency gate failed')
+        if unmatched or not errors or any(not math.isfinite(e[k]) for e in errors for k in ['translation_m','rotation_deg']) or maximum>0.001 or maximum_rotation>0.01:raise RuntimeError('Graph/dense internal numerical consistency gate failed')
+        if [stamp(p) for p in latest_dense.poses]!=odom_sequence:raise RuntimeError('Final dense changed to incomplete odometry sequence during graph capture')
         outcome['passed']=True
     except Exception:outcome['error']=traceback.format_exc()
     finally:
