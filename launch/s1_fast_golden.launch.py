@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Standalone S1 FAST modes, native image input, and optional golden RViz."""
+import math
 import os
 import re
 from pathlib import Path
@@ -114,6 +115,20 @@ def parse_ingest_spin_budget_ms(value):
     return budget
 
 
+def parse_image_admission_hz(value):
+    try:
+        rate = float(value)
+    except ValueError as error:
+        raise RuntimeError(
+            f"image_admission_hz must be finite and greater than 0 up to 50, got {value!r}"
+        ) from error
+    if not math.isfinite(rate) or rate <= 0.0 or rate > 50.0:
+        raise RuntimeError(
+            f"image_admission_hz must be finite and greater than 0 up to 50, got {value!r}"
+        )
+    return rate
+
+
 def launch_setup(context):
     def arg(name):
         return LaunchConfiguration(name).perform(context)
@@ -121,19 +136,22 @@ def launch_setup(context):
     sim_time = parse_bool(arg("use_sim_time"))
     use_rviz = parse_bool(arg("use_rviz"))
     ingest_spin_budget_ms = parse_ingest_spin_budget_ms(arg("ingest_spin_budget_ms"))
+    image_admission_hz = parse_image_admission_hz(arg("image_admission_hz"))
     ingest_diagnostics = parse_bool(arg("ingest_diagnostics"))
     paths, overrides, topic = resolve_contract(
         share, arg("mode"), arg("params_file"), arg("camera_params_file"),
         arg("input_mode"), arg("image_topic"), sim_time,
     )
     overrides["runtime.ingest_spin_budget_ms"] = ingest_spin_budget_ms
+    overrides["runtime.image_admission_hz"] = image_admission_hz
     overrides["diagnostics.ingest.enabled"] = ingest_diagnostics
     livox = validate_livox_runtime()
     actions = [LogInfo(msg=(
         f"S1 FAST: profiles={paths}, mode={arg('mode')}, input_mode={arg('input_mode')}, "
         f"image_topic={topic}, use_sim_time={sim_time} (launch argument; "
         f"{'/clock' if sim_time else 'system clock'}), "
-        f"ingest_spin_budget_ms={ingest_spin_budget_ms}, ingest_diagnostics={ingest_diagnostics}, "
+        f"ingest_spin_budget_ms={ingest_spin_budget_ms}, image_admission_hz={image_admission_hz}, "
+        f"ingest_diagnostics={ingest_diagnostics}, "
         f"livox_typesupport={livox}"
     )), Node(package="fast_livo", executable="fastlivo_mapping", name="laserMapping",
              output="screen", parameters=[*paths, overrides])]
@@ -152,7 +170,8 @@ def generate_launch_description():
     defaults = {
         "mode": "livo", "params_file": "", "camera_params_file": "",
         "input_mode": "raw", "image_topic": "", "use_sim_time": "true",
-        "use_rviz": "true", "ingest_spin_budget_ms": "0", "ingest_diagnostics": "false",
+        "use_rviz": "true", "ingest_spin_budget_ms": "0", "image_admission_hz": "50.0",
+        "ingest_diagnostics": "false",
         "rviz_config": str(Path(share) / "rviz_cfg" / "fast_livo2_golden.rviz"),
     }
     return LaunchDescription([

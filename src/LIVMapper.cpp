@@ -13,6 +13,7 @@ which is included as part of this source code package.
 #include "LIVMapper.h"
 #include <vikit/camera_loader.h>
 #include <boost/filesystem.hpp>
+#include <cmath>
 #include <limits>
 #include <rclcpp/executors/single_threaded_executor.hpp>
 
@@ -138,6 +139,7 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   try_declare.template operator()<double>("debug.plot_time", -10);
   try_declare.template operator()<int>("debug.frame_cnt", 6);
   try_declare.template operator()<int>("runtime.ingest_spin_budget_ms", 0);
+  try_declare.template operator()<double>("runtime.image_admission_hz", 50.0);
   try_declare.template operator()<bool>("diagnostics.ingest.enabled", false);
 
   try_declare.template operator()<double>("publish.blind_rgb_points", 0.01);
@@ -220,6 +222,12 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   {
     throw std::invalid_argument("runtime.ingest_spin_budget_ms must be in [0, 50]");
   }
+  this->node->get_parameter("runtime.image_admission_hz", image_admission_hz);
+  if (!std::isfinite(image_admission_hz) || image_admission_hz <= 0.0 || image_admission_hz > 50.0)
+  {
+    throw std::invalid_argument("runtime.image_admission_hz must be finite and in (0, 50]");
+  }
+  image_admission_interval = 1.0 / image_admission_hz;
   this->node->get_parameter("diagnostics.ingest.enabled", ingest_diagnostics_enabled);
 
   this->node->get_parameter("publish.blind_rgb_points", blind_rgb_points);
@@ -428,35 +436,40 @@ void LIVMapper::jpeg_callback(const sensor_msgs::msg::CompressedImage::SharedPtr
         return;
     }
     try {
-        // Decode JPEG image
+        const double corrected_timestamp = stamp2Sec(msg->header.stamp) + img_time_offset;
+        std::lock_guard<std::mutex> camera_lock(mtx_camera_callback);
+        {
+            std::lock_guard<std::mutex> buffer_lock(mtx_buffer);
+            const auto decision = imageAdmissionDecision(
+                corrected_timestamp, last_timestamp_img, image_admission_interval);
+            if (decision != ImageAdmissionDecision::ACCEPT) {
+                ++camera_skipped_count;
+                if (decision == ImageAdmissionDecision::OUT_OF_ORDER) {
+                    RCLCPP_ERROR(node->get_logger(), "image loop back.");
+                } else if (decision == ImageAdmissionDecision::TOO_SOON) {
+                    RCLCPP_DEBUG(node->get_logger(), "Image admission skipped: %.6f", corrected_timestamp);
+                }
+                return;
+            }
+        }
+
+        // Admission happens before JPEG decode. The camera mutex keeps accepted
+        // callbacks ordered while allowing IMU and LiDAR callbacks to use the buffer.
         cv::Mat image = cv::imdecode(cv::Mat(msg->data), cv::IMREAD_COLOR);
         if (image.empty()) {
             RCLCPP_ERROR(node->get_logger(), "Failed to decode JPEG image");
             return;
         }
-        // Calculate adjusted timestamp
-        double msg_header_time = stamp2Sec(msg->header.stamp) + img_time_offset;
-        // Skip duplicate or out-of-order images
-        if (abs(msg_header_time - last_timestamp_img) < 0.001) return;
-        if (msg_header_time < last_timestamp_img) {
-            RCLCPP_ERROR(node->get_logger(), "image loop back.");
-            return;
+        {
+            std::lock_guard<std::mutex> buffer_lock(mtx_buffer);
+            img_buffer.push_back(image);
+            img_time_buffer.push_back(corrected_timestamp);
+            last_timestamp_img = corrected_timestamp;
+            ++camera_accepted_count;
+            if (ingest_diagnostics_enabled) {
+                last_img_reception_time = std::chrono::steady_clock::now();
+            }
         }
-        // Skip images arriving too fast
-        if (msg_header_time - last_timestamp_img < 0.02) {
-            RCLCPP_WARN(node->get_logger(), "Image need Jumps: %.6f", msg_header_time);
-            return;
-        }
-        // Add to processing buffers
-        mtx_buffer.lock();
-        img_buffer.push_back(image);
-        img_time_buffer.push_back(msg_header_time);
-        last_timestamp_img = msg_header_time;
-        if (ingest_diagnostics_enabled) {
-            last_img_reception_time = std::chrono::steady_clock::now();
-        }
-        mtx_buffer.unlock();
-        // Notify processing thread
         sig_buffer.notify_all();
     } catch (const std::exception& e) {
         RCLCPP_ERROR(node->get_logger(), "Error decoding JPEG: %s", e.what());
@@ -877,6 +890,8 @@ void LIVMapper::logIngestDiagnostics()
   std::chrono::steady_clock::time_point imu_reception_time;
   std::chrono::steady_clock::time_point lidar_reception_time;
   std::chrono::steady_clock::time_point img_reception_time;
+  std::uint64_t camera_accepted_count_snapshot;
+  std::uint64_t camera_skipped_count_snapshot;
   {
     std::lock_guard<std::mutex> lock(mtx_buffer);
     imu_stamp = last_timestamp_imu;
@@ -888,7 +903,15 @@ void LIVMapper::logIngestDiagnostics()
     imu_reception_time = last_imu_reception_time;
     lidar_reception_time = last_lidar_reception_time;
     img_reception_time = last_img_reception_time;
+    camera_accepted_count_snapshot = camera_accepted_count;
+    camera_skipped_count_snapshot = camera_skipped_count;
   }
+  const auto camera_accepted_since_log =
+      camera_accepted_count_snapshot - last_logged_camera_accepted_count;
+  const auto camera_skipped_since_log =
+      camera_skipped_count_snapshot - last_logged_camera_skipped_count;
+  last_logged_camera_accepted_count = camera_accepted_count_snapshot;
+  last_logged_camera_skipped_count = camera_skipped_count_snapshot;
 
   const double missing = std::numeric_limits<double>::quiet_NaN();
   const double wall_now = std::chrono::duration<double>(
@@ -910,6 +933,7 @@ void LIVMapper::logIngestDiagnostics()
       "callback_idle_s imu=%.3f lidar=%.3f camera=%.3f; "
       "stamp_s imu=%.6f lidar=%.6f camera=%.6f; "
       "queue_size imu=%zu lidar=%zu camera=%zu; "
+      "camera_frames accepted=%llu skipped=%llu total_accepted=%llu total_skipped=%llu; "
       "estimator_stamp_s=%.6f estimator_wall_age_s=%.3f",
       stamp_age(imu_stamp), stamp_age(lidar_stamp), stamp_age(img_stamp),
       reception_idle_age(imu_reception_time),
@@ -917,6 +941,10 @@ void LIVMapper::logIngestDiagnostics()
       reception_idle_age(img_reception_time),
       imu_stamp, lidar_stamp, img_stamp,
       imu_queue_size, lidar_queue_size, img_queue_size,
+      static_cast<unsigned long long>(camera_accepted_since_log),
+      static_cast<unsigned long long>(camera_skipped_since_log),
+      static_cast<unsigned long long>(camera_accepted_count_snapshot),
+      static_cast<unsigned long long>(camera_skipped_count_snapshot),
       estimator_stamp, stamp_age(estimator_stamp));
 }
 
@@ -1209,44 +1237,42 @@ void LIVMapper::img_cbk(const sensor_msgs::msg::Image::ConstSharedPtr &msg_in)
     RCLCPP_DEBUG(node->get_logger(), "Skipping raw image processing");
     return;
   }
-  sensor_msgs::msg::Image::SharedPtr msg(new sensor_msgs::msg::Image(*msg_in));
-  double msg_header_time = stamp2Sec(msg->header.stamp) + img_time_offset;
-  if (abs(msg_header_time - last_timestamp_img) < 0.001) return;
-  RCLCPP_INFO(this->node->get_logger(), "Get image, its header time: %.6f", msg_header_time);
-  if (last_timestamp_lidar < 0) return;
+  const double corrected_timestamp = stamp2Sec(msg_in->header.stamp) + img_time_offset;
+  RCLCPP_DEBUG(this->node->get_logger(), "Get image, its header time: %.6f", corrected_timestamp);
 
-  if (msg_header_time < last_timestamp_img)
+  std::lock_guard<std::mutex> camera_lock(mtx_camera_callback);
   {
-    RCLCPP_ERROR(this->node->get_logger(), "image loop back. \n");
-    return;
+    std::lock_guard<std::mutex> buffer_lock(mtx_buffer);
+    if (last_timestamp_lidar < 0) return;
+    const auto decision = imageAdmissionDecision(
+        corrected_timestamp, last_timestamp_img, image_admission_interval);
+    if (decision != ImageAdmissionDecision::ACCEPT)
+    {
+      ++camera_skipped_count;
+      if (decision == ImageAdmissionDecision::OUT_OF_ORDER)
+      {
+        RCLCPP_ERROR(this->node->get_logger(), "image loop back. \n");
+      }
+      else if (decision == ImageAdmissionDecision::TOO_SOON)
+      {
+        RCLCPP_DEBUG(this->node->get_logger(), "Image admission skipped: %.6f", corrected_timestamp);
+      }
+      return;
+    }
   }
 
-  mtx_buffer.lock();
-
-  double img_time_correct = msg_header_time; // last_timestamp_lidar + 0.105;
-
-  if (img_time_correct - last_timestamp_img < 0.02)
+  // Do not copy the ROS image until it has been admitted.
+  cv::Mat img_cur = getImageFromMsg(msg_in);
   {
-    RCLCPP_WARN(this->node->get_logger(), "Image need Jumps: %.6f", img_time_correct);
-    mtx_buffer.unlock();
-    sig_buffer.notify_all();
-    return;
+    std::lock_guard<std::mutex> buffer_lock(mtx_buffer);
+    img_buffer.push_back(img_cur);
+    img_time_buffer.push_back(corrected_timestamp);
+    last_timestamp_img = corrected_timestamp;
+    ++camera_accepted_count;
+    if (ingest_diagnostics_enabled) {
+      last_img_reception_time = std::chrono::steady_clock::now();
+    }
   }
-
-  cv::Mat img_cur = getImageFromMsg(msg);
-  img_buffer.push_back(img_cur);
-  img_time_buffer.push_back(img_time_correct);
-
-  // ROS_INFO("Correct Image time: %.6f", img_time_correct);
-
-  last_timestamp_img = img_time_correct;
-  if (ingest_diagnostics_enabled) {
-    last_img_reception_time = std::chrono::steady_clock::now();
-  }
-  // cv::imshow("img", img);
-  // cv::waitKey(1);
-  // cout<<"last_timestamp_img:::"<<last_timestamp_img<<endl;
-  mtx_buffer.unlock();
   sig_buffer.notify_all();
 }
 

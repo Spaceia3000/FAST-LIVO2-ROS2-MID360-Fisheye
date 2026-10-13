@@ -18,6 +18,7 @@ which is included as part of this source code package.
 #include "preprocess.h"
 #include "fast_livo/msg/lidar_measurement_information.hpp"
 #include "lidar_localizability_calibration_transport.h"
+#include "image_admission.h"
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.hpp>
 #include <tf2_ros/transform_broadcaster.h>
@@ -25,6 +26,7 @@ which is included as part of this source code package.
 #include <nav_msgs/msg/path.hpp>
 #include <vikit/camera_loader.h>
 #include <chrono>
+#include <cstdint>
 
 class LIVMapper
 {
@@ -72,7 +74,7 @@ public:
   template <typename T> Eigen::Matrix<T, 3, 1> pointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi);
   cv::Mat getImageFromMsg(const sensor_msgs::msg::Image::ConstSharedPtr &img_msg);
 
-  std::mutex mtx_buffer, mtx_buffer_imu_prop;
+  std::mutex mtx_buffer, mtx_buffer_imu_prop, mtx_camera_callback;
   std::condition_variable sig_buffer;
 
   SLAM_MODE slam_mode_;
@@ -210,7 +212,13 @@ public:
   bool colmap_output_en = false;
   bool enable_image_processing = false; 
   int ingest_spin_budget_ms = 0;
+  double image_admission_hz = 50.0;
+  double image_admission_interval = 0.02;
   bool ingest_diagnostics_enabled = false;
+  std::uint64_t camera_accepted_count = 0;
+  std::uint64_t camera_skipped_count = 0;
+  std::uint64_t last_logged_camera_accepted_count = 0;
+  std::uint64_t last_logged_camera_skipped_count = 0;
   std::chrono::steady_clock::time_point last_imu_reception_time;
   std::chrono::steady_clock::time_point last_lidar_reception_time;
   std::chrono::steady_clock::time_point last_img_reception_time;
