@@ -43,7 +43,7 @@ def main():
     case=base.Case(args.output,dict(os.environ))
     qos=QoSProfile(depth=100,reliability=ReliabilityPolicy.BEST_EFFORT,durability=DurabilityPolicy.VOLATILE)
     counts={};first={};last={};bad_odom=0;bad_metric_clouds=0;metric_points=0;rgb_nonempty=0;rgb_valid=0;image_nonempty=0
-    rgb_colors=set();latest_graph=None;latest_dense=None;odom_seen=set();duplicates=0;backwards=0;prev=None
+    rgb_colors=set();latest_graph=None;latest_dense=None;odom_seen=set();odom_sequence=[];frames={};duplicates=0;backwards=0;prev=None
     rows=(args.output/'odom.csv').open('w');writer=csv.writer(rows)
     writer.writerow(['stamp_ns','x','y','z','qx','qy','qz','qw'])
     def stamp(msg): return int(msg.header.stamp.sec)*1000000000+int(msg.header.stamp.nanosec)
@@ -51,6 +51,7 @@ def main():
         counts[topic]=counts.get(topic,0)+1
         t=stamp(msg) if hasattr(msg,'header') else int(msg.clock.sec)*1000000000+int(msg.clock.nanosec)
         first.setdefault(topic,t);last[topic]=t
+        if hasattr(msg,'header'):frames.setdefault(topic,set()).add(msg.header.frame_id)
     def input_cb(topic): return lambda msg:seen(topic,msg)
     def finite_pose(p):
         return all(math.isfinite(x) for x in (p.position.x,p.position.y,p.position.z,p.orientation.x,p.orientation.y,p.orientation.z,p.orientation.w))
@@ -58,7 +59,7 @@ def main():
         nonlocal bad_odom,duplicates,backwards,prev
         seen('/aft_mapped_to_init',msg);t=stamp(msg);p=msg.pose.pose
         bad_odom+=int(not finite_pose(p) or not all(math.isfinite(x) for x in msg.pose.covariance))
-        duplicates+=int(t in odom_seen);backwards+=int(prev is not None and t<prev);prev=t;odom_seen.add(t)
+        duplicates+=int(t in odom_seen);backwards+=int(prev is not None and t<prev);prev=t;odom_seen.add(t);odom_sequence.append(t)
         writer.writerow([t,p.position.x,p.position.y,p.position.z,p.orientation.x,p.orientation.y,p.orientation.z,p.orientation.w])
     def rgb(msg):
         nonlocal rgb_nonempty,rgb_valid
@@ -114,6 +115,11 @@ def main():
         case.start('frontend',['ros2','launch','fast_livo','s1_fast_golden.launch.py','mode:=livo','use_rviz:=false','use_sim_time:=true'])
         case.start('backend',['ros2','launch','fast_livo2_rtabmap_bringup','backend.launch.py','launch_rviz:=false','use_sim_time:=true','database_path:='+str(args.output/'rtabmap.db')])
         case.check_nodes()
+        case.audit_maps()
+        expected_imu=overlay.parent.parent/'build/fast_livo/libimu_proc.so'
+        actual_imus={path for paths in case.result['loaded_paths'].values() for path in paths if pathlib.Path(path).name=='libimu_proc.so'}
+        if actual_imus!={str(expected_imu)}:raise RuntimeError('Wrong loaded IMU library: '+str(actual_imus))
+        outcome['loaded_imu_library']={'path':str(expected_imu),'sha256':hashlib.sha256(expected_imu.read_bytes()).hexdigest()}
         player=case.start('player',['ros2','bag','play','/home/breidy/Documents/datasets/ugv_fast_livo2/ugv_custom_fastlivo2_10',
             '--rate','0.5','--clock','40','--start-paused','--disable-keyboard-controls','--topics',*inputs])
         end=time.monotonic()+45;ready=False;endpoints={}
@@ -165,22 +171,57 @@ def main():
         if not(rgb_nonempty and rgb_valid and image_nonempty and len(rgb_colors)>1):raise RuntimeError('RGB/image publication gate failed')
         if latest_dense is None or not latest_dense.poses or not all(finite_pose(p.pose) for p in latest_dense.poses):raise RuntimeError('Invalid final dense trajectory')
         if last['/aft_mapped_to_init']<first['/camera/camera/color/image_raw']+145000000000:raise RuntimeError('LIVO failed to reach camera horizon')
+        expected_frames={'/aft_mapped_to_init':'camera_init','/cloud_registered_metric':'camera_init','/cloud_registered':'camera_init','/fast_livo2_rtabmap/trajectory_dense':'map'}
+        for topic,frame in expected_frames.items():
+            if frames.get(topic)!={frame}:raise RuntimeError('Unexpected frame '+topic+': '+str(frames.get(topic)))
+        dense_stamps=[stamp(p) for p in latest_dense.poses]
+        if dense_stamps!=odom_sequence:raise RuntimeError('Final dense timestamps do not equal entire observed odometry sequence')
+        outcome['final_dense_exact_odom_sequence']=True
+        unique_links={(min(x.from_id,x.to_id),max(x.from_id,x.to_id),x.type) for x in latest_graph.links}
+        if sum(x[2]==2 for x in unique_links)<1:raise RuntimeError('No native type2 closure in UGV10 integration regression')
+        capture_script=args.project_source/'tools/metric_parity/capture_graph_snapshot.py'
+        capture=case.start('graph_capture',['python3',str(capture_script),'--output-cdr',str(args.output/'optimized_graph.cdr'),'--output-json',str(args.output/'optimized_graph.json'),'--timeout','30'])
+        end=time.monotonic()+35
+        while capture.poll() is None and time.monotonic()<end:case.spin(.1)
+        if capture.poll()!=0:raise RuntimeError('Graph-only capture failed or timed out')
+        graph_snapshot=json.loads((args.output/'optimized_graph.json').read_text())
+        outcome['capture_script_sha256']=hashlib.sha256(capture_script.read_bytes()).hexdigest()
+        node_stamps={n['id']:round(n['stamp']*1e9) for n in graph_snapshot['nodes']}
+        dense_by_stamp={stamp(p):p.pose for p in latest_dense.poses}
+        errors=[];unmatched=[]
+        for item in graph_snapshot['optimized_poses']:
+            identifier=item['id'];t=node_stamps.get(identifier)
+            if t not in dense_by_stamp:unmatched.append(identifier);continue
+            a=item['pose'];b=dense_by_stamp[t]
+            translation=float(np.linalg.norm(np.array(a['translation_xyz'])-[b.position.x,b.position.y,b.position.z]))
+            qa=np.array(a['quaternion_xyzw']);qb=np.array([b.orientation.x,b.orientation.y,b.orientation.z,b.orientation.w])
+            rotation=math.degrees(2*math.acos(float(np.clip(abs(np.dot(qa,qb)/(np.linalg.norm(qa)*np.linalg.norm(qb))),0,1))))
+            errors.append({'id':identifier,'stamp_ns':t,'translation_m':translation,'rotation_deg':rotation})
+        maximum=max((e['translation_m'] for e in errors),default=float('inf'))
+        maximum_rotation=max((e['rotation_deg'] for e in errors),default=float('inf'))
+        anchors={'graph_poses':len(graph_snapshot['optimized_poses']),'matched':len(errors),'unmatched_ids':unmatched,'max_translation_m':maximum,'max_rotation_deg':maximum_rotation,'anchors':errors,'scope':'Internal optimized graph/dense consistency, not GT accuracy; GetMap2 has no remote epoch.'}
+        (args.output/'anchor_consistency.json').write_text(json.dumps(anchors,indent=2)+'\n')
+        outcome['anchor_consistency']={k:v for k,v in anchors.items() if k!='anchors'}
+        if unmatched or not errors or maximum>0.001 or maximum_rotation>0.01:raise RuntimeError('Graph/dense internal numerical consistency gate failed')
         outcome['passed']=True
     except Exception:outcome['error']=traceback.format_exc()
     finally:
         rows.close()
-        if latest_dense is not None:
-            (args.output/'final_dense.cdr').write_bytes(serialize_message(latest_dense))
-            outcome['final_dense_pose_count']=len(latest_dense.poses)
-        if latest_graph is not None:
-            (args.output/'final_mapgraph.cdr').write_bytes(serialize_message(latest_graph))
-            unique={(min(x.from_id,x.to_id),max(x.from_id,x.to_id),x.type) for x in latest_graph.links}
-            outcome['final_graph_pose_count']=len(latest_graph.poses)
-            outcome['final_graph_link_counts']={str(t):sum(x[2]==t for x in unique) for t in sorted({x[2] for x in unique})}
-        outcome.update({'counts':counts,'first_stamp_ns':first,'last_stamp_ns':last,'bad_odom':bad_odom,
-                        'duplicate_odom_stamps':duplicates,'backward_odom_stamps':backwards,
-                        'nonempty_rgb_clouds':rgb_nonempty,'xyz_rgb_clouds':rgb_valid,'sampled_unique_rgb':len(rgb_colors),
-                        'nonempty_images':image_nonempty,'bad_metric_clouds':bad_metric_clouds,'metric_points_checked':metric_points,'wall_seconds':time.monotonic()-started})
+        try:
+            if latest_dense is not None:
+                (args.output/'final_dense.cdr').write_bytes(serialize_message(latest_dense))
+                outcome['final_dense_pose_count']=len(latest_dense.poses)
+            if latest_graph is not None:
+                (args.output/'final_mapgraph.cdr').write_bytes(serialize_message(latest_graph))
+                unique={(min(x.from_id,x.to_id),max(x.from_id,x.to_id),x.type) for x in latest_graph.links}
+                outcome['final_graph_pose_count']=len(latest_graph.poses)
+                outcome['final_graph_link_counts']={str(t):sum(x[2]==t for x in unique) for t in sorted({x[2] for x in unique})}
+            outcome.update({'counts':counts,'frames':{k:sorted(v) for k,v in frames.items()},'first_stamp_ns':first,'last_stamp_ns':last,'bad_odom':bad_odom,
+                            'duplicate_odom_stamps':duplicates,'backward_odom_stamps':backwards,
+                            'nonempty_rgb_clouds':rgb_nonempty,'xyz_rgb_clouds':rgb_valid,'sampled_unique_rgb':len(rgb_colors),
+                            'nonempty_images':image_nonempty,'bad_metric_clouds':bad_metric_clouds,'metric_points_checked':metric_points,'wall_seconds':time.monotonic()-started})
+        except Exception:
+            outcome['passed']=False;outcome['evidence_error']=traceback.format_exc()
         clean=case.close();outcome['cleanup_passed']=clean;outcome['passed'] &= clean
         (args.output/'regression.json').write_text(json.dumps(outcome,indent=2)+'\n')
         print(json.dumps(outcome,indent=2),flush=True)
