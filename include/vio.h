@@ -124,11 +124,13 @@ public:
 
   int frame_count = 0;
   bool plot_flag;
-  // Updated only on the mapping thread; reset at the start of each retrieval.
+  // Updated only on the mapping thread; per-retrieval counters are reset there.
   bool diagnostics_enabled = false;
   double diagnostics_retrieve_last_ms = 0.0;
   std::uint64_t diagnostics_candidates_direct = 0;
   std::uint64_t diagnostics_candidates_raycast = 0;
+  // Lifetime total; zero-cap admission never increments it.
+  std::uint64_t diagnostics_rejected_by_cap_total = 0;
 
   Eigen::Matrix<double, DIM_STATE, DIM_STATE> G, H_T_H;
   Eigen::MatrixXd K, H_sub_inv;

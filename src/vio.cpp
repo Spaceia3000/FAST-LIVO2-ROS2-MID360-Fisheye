@@ -237,6 +237,7 @@ bool VIOManager::insertPointIntoVoxelMap(std::unique_ptr<VisualPoint> pt_new)
       iter == feat_map.end() ? 0U : iter->second->voxel_points.size();
   if (!visual_map_growth::bucketAdmits(voxel_point_count, max_visual_points_per_voxel))
   {
+    ++diagnostics_rejected_by_cap_total;
     return false;
   }
 
@@ -890,7 +891,11 @@ void VIOManager::generateVisualMapPoints(cv::Mat img, vector<pointWithVar> &pg)
       const auto voxel = feat_map.find(position);
       const std::size_t voxel_point_count =
           voxel == feat_map.end() ? 0U : voxel->second->voxel_points.size();
-      if (!visual_map_growth::bucketAdmits(voxel_point_count, max_visual_points_per_voxel)) continue;
+      if (!visual_map_growth::bucketAdmits(voxel_point_count, max_visual_points_per_voxel))
+      {
+        ++diagnostics_rejected_by_cap_total;
+        continue;
+      }
 
       V3D norm_vec(new_frame_->T_f_w_.rotationMatrix() * pt_var.normal);
       V3D dir(new_frame_->T_f_w_ * pt);
@@ -1917,8 +1922,18 @@ VioDiagnosticsSnapshot VIOManager::diagnosticsSnapshot(std::size_t geometric_vox
   snapshot.visual_voxels = this->feat_map.size();
   for (const auto &voxel : this->feat_map)
   {
-    if (voxel.second != nullptr) snapshot.visual_points += voxel.second->voxel_points.size();
+    if (voxel.second != nullptr)
+    {
+      const std::size_t occupancy = voxel.second->voxel_points.size();
+      snapshot.visual_points += occupancy;
+      if (occupancy > snapshot.max_voxel_occupancy)
+      {
+        snapshot.max_voxel_occupancy = occupancy;
+      }
+    }
   }
+  snapshot.configured_cap = max_visual_points_per_voxel;
+  snapshot.rejected_by_cap_total = diagnostics_rejected_by_cap_total;
   snapshot.geometric_voxels = geometric_voxels;
   snapshot.retrieve_last_ms = diagnostics_retrieve_last_ms;
   snapshot.candidates_direct = diagnostics_candidates_direct;
