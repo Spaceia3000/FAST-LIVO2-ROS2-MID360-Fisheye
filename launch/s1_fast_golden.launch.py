@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Standalone S1 FAST modes, native image input, and optional golden RViz."""
-import math
 import os
 import re
 from pathlib import Path
@@ -12,11 +11,7 @@ from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-MODES = {
-    "lo": {"common.img_en": 0, "common.lidar_en": 1, "imu.imu_en": False},
-    "lio": {"common.img_en": 0, "common.lidar_en": 1, "imu.imu_en": True},
-    "livo": {"common.img_en": 1, "common.lidar_en": 1, "imu.imu_en": True},
-}
+MODES = ("lo", "lio", "livo")
 
 
 def validate_livox_runtime():
@@ -96,7 +91,6 @@ def resolve_contract(share, mode="livo", params_file="", camera_params_file="",
     }
     if image_topic:
         overrides["common.img_topic"] = image_topic
-    overrides.update(MODES[mode])
     return paths, overrides, topic
 
 
@@ -106,70 +100,21 @@ def parse_bool(value):
     return value.lower() == "true"
 
 
-def parse_ingest_spin_budget_ms(value):
-    if not re.fullmatch(r"\d+", value):
-        raise RuntimeError(f"ingest_spin_budget_ms must be an integer from 0 to 50, got {value!r}")
-    budget = int(value)
-    if budget > 50:
-        raise RuntimeError(f"ingest_spin_budget_ms must be an integer from 0 to 50, got {value!r}")
-    return budget
-
-
-def parse_image_admission_hz(value):
-    try:
-        rate = float(value)
-    except ValueError as error:
-        raise RuntimeError(
-            f"image_admission_hz must be finite and greater than 0 up to 50, got {value!r}"
-        ) from error
-    if not math.isfinite(rate) or rate <= 0.0 or rate > 50.0:
-        raise RuntimeError(
-            f"image_admission_hz must be finite and greater than 0 up to 50, got {value!r}"
-        )
-    return rate
-
-
-def parse_max_visual_points_per_voxel(value):
-    if not re.fullmatch(r"\d+", value):
-        raise RuntimeError(
-            f"max_visual_points_per_voxel must be a nonnegative 64-bit integer, got {value!r}"
-        )
-    cap = int(value)
-    if cap > 2**63 - 1:
-        raise RuntimeError(
-            f"max_visual_points_per_voxel must be a nonnegative 64-bit integer, got {value!r}"
-        )
-    return cap
-
-
 def launch_setup(context):
     def arg(name):
         return LaunchConfiguration(name).perform(context)
     share = get_package_share_directory("fast_livo")
     sim_time = parse_bool(arg("use_sim_time"))
     use_rviz = parse_bool(arg("use_rviz"))
-    ingest_spin_budget_ms = parse_ingest_spin_budget_ms(arg("ingest_spin_budget_ms"))
-    image_admission_hz = parse_image_admission_hz(arg("image_admission_hz"))
-    max_visual_points_per_voxel = parse_max_visual_points_per_voxel(
-        arg("max_visual_points_per_voxel")
-    )
-    ingest_diagnostics = parse_bool(arg("ingest_diagnostics"))
     paths, overrides, topic = resolve_contract(
         share, arg("mode"), arg("params_file"), arg("camera_params_file"),
         arg("input_mode"), arg("image_topic"), sim_time,
     )
-    overrides["runtime.ingest_spin_budget_ms"] = ingest_spin_budget_ms
-    overrides["runtime.image_admission_hz"] = image_admission_hz
-    overrides["vio.max_visual_points_per_voxel"] = max_visual_points_per_voxel
-    overrides["diagnostics.ingest.enabled"] = ingest_diagnostics
     livox = validate_livox_runtime()
     actions = [LogInfo(msg=(
         f"S1 FAST: profiles={paths}, mode={arg('mode')}, input_mode={arg('input_mode')}, "
         f"image_topic={topic}, use_sim_time={sim_time} (launch argument; "
         f"{'/clock' if sim_time else 'system clock'}), "
-        f"ingest_spin_budget_ms={ingest_spin_budget_ms}, image_admission_hz={image_admission_hz}, "
-        f"max_visual_points_per_voxel={max_visual_points_per_voxel}, "
-        f"ingest_diagnostics={ingest_diagnostics}, "
         f"livox_typesupport={livox}"
     )), Node(package="fast_livo", executable="fastlivo_mapping", name="laserMapping",
              output="screen", parameters=[*paths, overrides])]
@@ -185,13 +130,10 @@ def launch_setup(context):
 
 def generate_launch_description():
     share = get_package_share_directory("fast_livo")
-    # Keep the cap opt-in; 64 is an experimental Jetson test value, not a tuned default.
     defaults = {
         "mode": "livo", "params_file": "", "camera_params_file": "",
         "input_mode": "raw", "image_topic": "", "use_sim_time": "true",
-        "use_rviz": "true", "ingest_spin_budget_ms": "0", "image_admission_hz": "50.0",
-        "max_visual_points_per_voxel": "0",
-        "ingest_diagnostics": "false",
+        "use_rviz": "true",
         "rviz_config": str(Path(share) / "rviz_cfg" / "fast_livo2_golden.rviz"),
     }
     return LaunchDescription([

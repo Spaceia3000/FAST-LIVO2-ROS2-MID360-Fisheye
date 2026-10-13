@@ -38,10 +38,11 @@ def launch_module(monkeypatch):
 def test_modes(launch_module, mode, img, imu):
     paths, overrides, _ = launch_module.resolve_contract(REPO, mode)
     assert paths == [str(REPO / f"config/ugv_v1_{mode}.yaml")]
-    assert type(overrides["common.img_en"]) is int and overrides["common.img_en"] == img
-    assert overrides["common.lidar_en"] == 1
-    assert overrides["imu.imu_en"] is imu
-    assert overrides["common.enable_image_processing"] is False
+    profile = launch_module.load_parameters(paths[0])
+    assert type(profile["common.img_en"]) is int and profile["common.img_en"] == img
+    assert profile["common.lidar_en"] == 1
+    assert profile["imu.imu_en"] is imu
+    assert overrides == {"use_sim_time": True, "common.enable_image_processing": False}
 
 
 @pytest.mark.parametrize("mode", ["LO", "", "unknown", " lio"])
@@ -50,15 +51,25 @@ def test_invalid_mode(launch_module, mode):
         launch_module.resolve_contract(REPO, mode)
 
 
-def test_custom_files_order_and_authoritative_modes(launch_module, tmp_path):
+def test_custom_files_order_without_implicit_overrides(launch_module, tmp_path):
     base = tmp_path / "base.yaml"
     camera = tmp_path / "camera.yaml"
-    base.write_text("/**: {ros__parameters: {common: {img_en: 1, img_topic: /custom}, imu: {imu_en: true}}}")
+    base.write_text("/**: {ros__parameters: {common: {img_en: 1, img_topic: /custom}, imu: {imu_en: true}, runtime: {ingest_spin_budget_ms: 7, image_admission_hz: 12.5}}}")
     camera.write_text("/**: {ros__parameters: {camera: {fx: 123.4}, common: {img_en: 1}}}")
     before = [base.read_bytes(), camera.read_bytes()]
     paths, overrides, topic = launch_module.resolve_contract(REPO, "lo", str(base), str(camera))
     assert paths == [str(base), str(camera)]
-    assert overrides["common.img_en"] == 0 and overrides["imu.imu_en"] is False
+    effective = {}
+    for path in paths:
+        effective.update(launch_module.load_parameters(path))
+    assert effective["common.img_en"] == 1 and effective["imu.imu_en"] is True
+    assert effective["runtime.ingest_spin_budget_ms"] == 7
+    assert effective["runtime.image_admission_hz"] == 12.5
+    assert not set(overrides) & {
+        "common.img_en", "common.lidar_en", "imu.imu_en",
+        "runtime.ingest_spin_budget_ms", "runtime.image_admission_hz",
+        "vio.max_visual_points_per_voxel", "diagnostics.ingest.enabled",
+    }
     assert "camera.fx" not in overrides and topic == "/custom"
     assert before == [base.read_bytes(), camera.read_bytes()]
 
@@ -77,28 +88,6 @@ def test_compressed_input(launch_module):
     assert overrides["common.img_topic"] == topic == "/image/compressed"
 
 
-@pytest.mark.parametrize("value,expected", [("50.0", 50.0), ("10.0", 10.0), ("0.001", 0.001)])
-def test_image_admission_hz_boundaries(launch_module, value, expected):
-    assert launch_module.parse_image_admission_hz(value) == expected
-
-
-@pytest.mark.parametrize("value", ["0", "-1", "50.0001", "nan", "inf", "-inf", "", "bad"])
-def test_invalid_image_admission_hz(launch_module, value):
-    with pytest.raises(RuntimeError, match="image_admission_hz"):
-        launch_module.parse_image_admission_hz(value)
-
-
-@pytest.mark.parametrize("value,expected", [("0", 0), ("64", 64), (str(2**63 - 1), 2**63 - 1)])
-def test_max_visual_points_per_voxel_boundaries(launch_module, value, expected):
-    assert launch_module.parse_max_visual_points_per_voxel(value) == expected
-
-
-@pytest.mark.parametrize("value", ["-1", str(2**63), "1.0", "+1", "", "bad"])
-def test_invalid_max_visual_points_per_voxel(launch_module, value):
-    with pytest.raises(RuntimeError, match="max_visual_points_per_voxel"):
-        launch_module.parse_max_visual_points_per_voxel(value)
-
-
 @pytest.mark.parametrize("content", ["[", "[]", "{}", "/**: {}", "/**: {ros__parameters: []}", "/wrong: {ros__parameters: {x: 1}}"])
 def test_malformed_profile(launch_module, tmp_path, content):
     path = tmp_path / "bad.yaml"; path.write_text(content)
@@ -114,19 +103,58 @@ def test_launch_processes_and_parameter_order(launch_module, monkeypatch, rviz):
     monkeypatch.setattr(launch_module, "validate_livox_runtime", lambda: "/sensor/lib/typesupport.so")
     defaults = {a.name: a.default_value for a in launch_module.generate_launch_description() if hasattr(a, "name")}
     assert defaults["mode"] == "livo" and defaults["use_sim_time"] == defaults["use_rviz"] == "true"
-    assert defaults["image_admission_hz"] == "50.0"
-    assert defaults["max_visual_points_per_voxel"] == "0"
+    assert set(defaults) == {
+        "mode", "params_file", "camera_params_file", "input_mode", "image_topic",
+        "use_sim_time", "use_rviz", "rviz_config",
+    }
     defaults["use_rviz"] = rviz
     actions = launch_module.launch_setup(defaults)
     nodes = [a for a in actions if hasattr(a, "package")]
     assert [(a.package, a.executable) for a in nodes] == [("fast_livo", "fastlivo_mapping")] + ([("rviz2", "rviz2")] if rviz == "true" else [])
-    assert nodes[0].parameters[-1]["common.img_en"] == 1
-    assert nodes[0].parameters[-1]["use_sim_time"] is True
-    assert nodes[0].parameters[-1]["runtime.image_admission_hz"] == 50.0
-    assert nodes[0].parameters[-1]["vio.max_visual_points_per_voxel"] == 0
+    assert nodes[0].parameters == [
+        str(REPO / "config/ugv_v1_livo.yaml"),
+        {"use_sim_time": True, "common.enable_image_processing": False},
+    ]
     assert "profiles=" in actions[0].msg and "use_sim_time=True" in actions[0].msg
-    assert "image_admission_hz=50.0" in actions[0].msg
-    assert "max_visual_points_per_voxel=0" in actions[0].msg
+
+
+def test_livo_yaml_controls_runtime_options(launch_module):
+    profile = launch_module.load_parameters(REPO / "config/ugv_v1_livo.yaml")
+    assert profile["runtime.ingest_spin_budget_ms"] == 5
+    assert profile["runtime.image_admission_hz"] == 10.0
+    assert profile["diagnostics.ingest.enabled"] is False
+    assert profile["vio.max_visual_points_per_voxel"] == 64
+
+
+def test_cpp_fallbacks_apply_when_yaml_omits_runtime_options(launch_module):
+    for mode in ("lo", "lio"):
+        profile = launch_module.load_parameters(REPO / f"config/ugv_v1_{mode}.yaml")
+        assert "runtime.ingest_spin_budget_ms" not in profile
+        assert "runtime.image_admission_hz" not in profile
+        assert "diagnostics.ingest.enabled" not in profile
+        assert "vio.max_visual_points_per_voxel" not in profile
+    source = (REPO / "src/LIVMapper.cpp").read_text()
+    for declaration in (
+        'operator()<int>("runtime.ingest_spin_budget_ms", 0)',
+        'operator()<double>("runtime.image_admission_hz", 50.0)',
+        'operator()<bool>("diagnostics.ingest.enabled", false)',
+        'operator()<std::int64_t>("vio.max_visual_points_per_voxel", 0)',
+    ):
+        assert declaration in source
+
+
+def test_canonical_camera_and_extrinsics_match_across_modes(launch_module):
+    profiles = [
+        launch_module.load_parameters(REPO / f"config/ugv_v1_{mode}.yaml")
+        for mode in ("lo", "lio", "livo")
+    ]
+    protected = [key for key in profiles[0] if key.startswith(("camera.", "extrin_calib."))]
+    assert protected
+    assert all(
+        profile[key] == profiles[0][key]
+        for profile in profiles[1:]
+        for key in protected
+    )
 
 
 def test_image_admission_policy_offline(tmp_path):
@@ -153,26 +181,6 @@ int main()
     )
     assert compiled.returncode == 0, compiled.stderr
     subprocess.run([str(binary)], check=True)
-
-
-def test_image_admission_launch_override(launch_module, monkeypatch):
-    monkeypatch.setattr(launch_module, "validate_livox_runtime", lambda: "/sensor/lib/typesupport.so")
-    defaults = {a.name: a.default_value for a in launch_module.generate_launch_description() if hasattr(a, "name")}
-    defaults["image_admission_hz"] = "10.0"
-    actions = launch_module.launch_setup(defaults)
-    mapping = next(a for a in actions if getattr(a, "executable", None) == "fastlivo_mapping")
-    assert mapping.parameters[-1]["runtime.image_admission_hz"] == 10.0
-    assert "image_admission_hz=10.0" in actions[0].msg
-
-
-def test_visual_map_cap_launch_override(launch_module, monkeypatch):
-    monkeypatch.setattr(launch_module, "validate_livox_runtime", lambda: "/sensor/lib/typesupport.so")
-    defaults = {a.name: a.default_value for a in launch_module.generate_launch_description() if hasattr(a, "name")}
-    defaults["max_visual_points_per_voxel"] = "64"
-    actions = launch_module.launch_setup(defaults)
-    mapping = next(a for a in actions if getattr(a, "executable", None) == "fastlivo_mapping")
-    assert mapping.parameters[-1]["vio.max_visual_points_per_voxel"] == 64
-    assert "max_visual_points_per_voxel=64" in actions[0].msg
 
 
 def test_livox_runtime_fail_closed(launch_module, monkeypatch, tmp_path):
