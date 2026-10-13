@@ -17,8 +17,8 @@
     common:
       img_en: 1
       img_topic: /camera/camera/color/image_raw
-      imu_topic: /livox/imu
-      lid_topic: /livox/lidar
+      imu_topic: /mid360/livox/imu
+      lid_topic: /mid360/livox/lidar
       lidar_en: 1
       ros_driver_bug_fix: false
     evo:
