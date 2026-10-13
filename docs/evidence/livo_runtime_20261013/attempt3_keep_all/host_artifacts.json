@@ -1,0 +1,77 @@
+{
+  "host_path": "/home/breidy/Documents/fast_livo2_worktrees/imu_validation_20261013/livo_regression_keepall_20261013T210406Z",
+  "files": {
+    "frontend.log": {
+      "bytes": 12728333,
+      "sha256": "fed0281493047f4a12fe2d9687a958240d01d7104916841583d5c111993d4442"
+    },
+    "regression.json": {
+      "bytes": 6168,
+      "sha256": "5a7d04857cd6d327f637981d428ffee0fd47a5bc06ccb2abb0aeb90a635b54c8"
+    },
+    "anchor_consistency.json": {
+      "bytes": 19722,
+      "sha256": "9e1cd5b4424bcb1b903444ffe08fae696b676a4476ba6c89111e778aea510b36"
+    },
+    "rtabmap.db": {
+      "bytes": 21700608,
+      "sha256": "3ca773d7c61c71c6fe74eb098ac2fe2cad171698ae14478300b3665963dc516d"
+    },
+    "optimized_graph.json": {
+      "bytes": 268340,
+      "sha256": "0d3d173a34f26ed4c0c680b73f380df133034ff3fb1f24f3dd25bde4dc91ccb3"
+    },
+    "player_qos.yaml": {
+      "bytes": 259,
+      "sha256": "06bbad1f1133fd51459c0be5191b6bdfb1bf07b6265c780ee126d1518f60be73"
+    },
+    "camera_receipt_integrity.json": {
+      "bytes": 952,
+      "sha256": "edfcc38480f054166905e65b4b16df90b72d373a220422d953bc042a924517ef"
+    },
+    "result.json": {
+      "bytes": 76222,
+      "sha256": "8769f2c9aa99c33a07108e9cb5bec96191d74b2c6cd68ab19164e65a2944c103"
+    },
+    "odom.csv": {
+      "bytes": 464653,
+      "sha256": "67974e8329c5352b81726202349a99de32fe29f7278ae60925ee386708d50011"
+    },
+    "player.log": {
+      "bytes": 955,
+      "sha256": "180301534cece8d7a07f9205136fdfcd6b18325c1f74b0ad980bee06a87e4998"
+    },
+    "independent_cleanup.json": {
+      "bytes": 187,
+      "sha256": "a012683adff8af98fb1cdfef512202f62389934a21460aac76e9e8d071d08856"
+    },
+    "native_runtime_bindings.json": {
+      "bytes": 1555,
+      "sha256": "710c41d887b36e76b973a593f61b28274bd721e670f15e28e383f756b5060915"
+    },
+    "optimized_graph.cdr": {
+      "bytes": 184876,
+      "sha256": "912b3d0b8b237b04ed84496e0d8c3ad4c598126b68b58cbe16b49391d160049b"
+    },
+    "graph_capture.log": {
+      "bytes": 105,
+      "sha256": "053323b9a09d8733a71fcbf0e542f1c99936fe0917eaba6fc29daaa54d295e98"
+    },
+    "input_stamps.csv": {
+      "bytes": 1913660,
+      "sha256": "f6606c1e07b3373d1b93b35a317f432c170feeaad5bf08df62803e2ecd21086d"
+    },
+    "final_mapgraph.cdr": {
+      "bytes": 66748,
+      "sha256": "e309f071bc0a82c0168d32c728c9c07304803568f38a0fef9686ebccbdfcc0d9"
+    },
+    "final_dense.cdr": {
+      "bytes": 215596,
+      "sha256": "7055e4915ab32f6b30e328400cfa7564773951b8866975935182ccecb217ed13"
+    },
+    "backend.log": {
+      "bytes": 72815,
+      "sha256": "0eb0a1d7ea02858188197f2f97bfe893f0f04dcc7c87e769625bbd375840b819"
+    }
+  }
+}
