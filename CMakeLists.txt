@@ -238,6 +238,19 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
 
   ament_add_gtest(
+    test_visual_map_growth
+    test/test_visual_map_growth.cpp
+  )
+
+  if(TARGET test_visual_map_growth)
+    target_include_directories(
+      test_visual_map_growth
+      PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+  endif()
+
+  ament_add_gtest(
     test_lidar_frame_provenance
     test/test_lidar_frame_provenance.cpp
   )

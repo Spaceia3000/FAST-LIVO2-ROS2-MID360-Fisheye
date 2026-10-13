@@ -16,8 +16,10 @@ which is included as part of this source code package.
 #include "voxel_map.h"
 #include "feature.h"
 #include "vio_diagnostics.h"
+#include "visual_map_growth.h"
 #include <opencv2/imgproc/imgproc_c.h>
 #include <pcl/filters/voxel_grid.h>
+#include <memory>
 #include <set>
 #include <vikit/math_utils.h>
 #include <vikit/robust_cost.h>
@@ -107,6 +109,8 @@ public:
   double fx, fy, cx, cy;
   int patch_pyrimid_level, patch_size, patch_size_total, patch_size_half, border, warp_len;
   int max_iterations, total_points;
+  // First-in admission cap only; zero preserves unbounded visual-map growth.
+  std::int64_t max_visual_points_per_voxel = 0;
 
   double img_point_cov, outlier_threshold, ncc_thre;
   
@@ -167,7 +171,7 @@ public:
                                      const V3D &xyz_ref, const V3D &normal_ref, const SE3<double> &T_cur_ref, const int level_ref, Matrix2d &A_cur_ref);
   void warpAffine(const Matrix2d &A_cur_ref, const cv::Mat &img_ref, const Vector2d &px_ref, const int level_ref, const int search_level,
                   const int pyramid_level, const int halfpatch_size, float *patch);
-  void insertPointIntoVoxelMap(VisualPoint *pt_new);
+  bool insertPointIntoVoxelMap(std::unique_ptr<VisualPoint> pt_new);
   void plotTrackedPoints();
   void updateFrameState(StatesGroup state);
   void projectPatchFromRefToCur(const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &plane_map);

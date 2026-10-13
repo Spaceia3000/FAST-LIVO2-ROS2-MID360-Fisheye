@@ -129,6 +129,19 @@ def parse_image_admission_hz(value):
     return rate
 
 
+def parse_max_visual_points_per_voxel(value):
+    if not re.fullmatch(r"\d+", value):
+        raise RuntimeError(
+            f"max_visual_points_per_voxel must be a nonnegative 64-bit integer, got {value!r}"
+        )
+    cap = int(value)
+    if cap > 2**63 - 1:
+        raise RuntimeError(
+            f"max_visual_points_per_voxel must be a nonnegative 64-bit integer, got {value!r}"
+        )
+    return cap
+
+
 def launch_setup(context):
     def arg(name):
         return LaunchConfiguration(name).perform(context)
@@ -137,6 +150,9 @@ def launch_setup(context):
     use_rviz = parse_bool(arg("use_rviz"))
     ingest_spin_budget_ms = parse_ingest_spin_budget_ms(arg("ingest_spin_budget_ms"))
     image_admission_hz = parse_image_admission_hz(arg("image_admission_hz"))
+    max_visual_points_per_voxel = parse_max_visual_points_per_voxel(
+        arg("max_visual_points_per_voxel")
+    )
     ingest_diagnostics = parse_bool(arg("ingest_diagnostics"))
     paths, overrides, topic = resolve_contract(
         share, arg("mode"), arg("params_file"), arg("camera_params_file"),
@@ -144,6 +160,7 @@ def launch_setup(context):
     )
     overrides["runtime.ingest_spin_budget_ms"] = ingest_spin_budget_ms
     overrides["runtime.image_admission_hz"] = image_admission_hz
+    overrides["vio.max_visual_points_per_voxel"] = max_visual_points_per_voxel
     overrides["diagnostics.ingest.enabled"] = ingest_diagnostics
     livox = validate_livox_runtime()
     actions = [LogInfo(msg=(
@@ -151,6 +168,7 @@ def launch_setup(context):
         f"image_topic={topic}, use_sim_time={sim_time} (launch argument; "
         f"{'/clock' if sim_time else 'system clock'}), "
         f"ingest_spin_budget_ms={ingest_spin_budget_ms}, image_admission_hz={image_admission_hz}, "
+        f"max_visual_points_per_voxel={max_visual_points_per_voxel}, "
         f"ingest_diagnostics={ingest_diagnostics}, "
         f"livox_typesupport={livox}"
     )), Node(package="fast_livo", executable="fastlivo_mapping", name="laserMapping",
@@ -167,10 +185,12 @@ def launch_setup(context):
 
 def generate_launch_description():
     share = get_package_share_directory("fast_livo")
+    # Keep the cap opt-in; 64 is an experimental Jetson test value, not a tuned default.
     defaults = {
         "mode": "livo", "params_file": "", "camera_params_file": "",
         "input_mode": "raw", "image_topic": "", "use_sim_time": "true",
         "use_rviz": "true", "ingest_spin_budget_ms": "0", "image_admission_hz": "50.0",
+        "max_visual_points_per_voxel": "0",
         "ingest_diagnostics": "false",
         "rviz_config": str(Path(share) / "rviz_cfg" / "fast_livo2_golden.rviz"),
     }

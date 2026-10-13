@@ -88,6 +88,17 @@ def test_invalid_image_admission_hz(launch_module, value):
         launch_module.parse_image_admission_hz(value)
 
 
+@pytest.mark.parametrize("value,expected", [("0", 0), ("64", 64), (str(2**63 - 1), 2**63 - 1)])
+def test_max_visual_points_per_voxel_boundaries(launch_module, value, expected):
+    assert launch_module.parse_max_visual_points_per_voxel(value) == expected
+
+
+@pytest.mark.parametrize("value", ["-1", str(2**63), "1.0", "+1", "", "bad"])
+def test_invalid_max_visual_points_per_voxel(launch_module, value):
+    with pytest.raises(RuntimeError, match="max_visual_points_per_voxel"):
+        launch_module.parse_max_visual_points_per_voxel(value)
+
+
 @pytest.mark.parametrize("content", ["[", "[]", "{}", "/**: {}", "/**: {ros__parameters: []}", "/wrong: {ros__parameters: {x: 1}}"])
 def test_malformed_profile(launch_module, tmp_path, content):
     path = tmp_path / "bad.yaml"; path.write_text(content)
@@ -104,6 +115,7 @@ def test_launch_processes_and_parameter_order(launch_module, monkeypatch, rviz):
     defaults = {a.name: a.default_value for a in launch_module.generate_launch_description() if hasattr(a, "name")}
     assert defaults["mode"] == "livo" and defaults["use_sim_time"] == defaults["use_rviz"] == "true"
     assert defaults["image_admission_hz"] == "50.0"
+    assert defaults["max_visual_points_per_voxel"] == "0"
     defaults["use_rviz"] = rviz
     actions = launch_module.launch_setup(defaults)
     nodes = [a for a in actions if hasattr(a, "package")]
@@ -111,8 +123,10 @@ def test_launch_processes_and_parameter_order(launch_module, monkeypatch, rviz):
     assert nodes[0].parameters[-1]["common.img_en"] == 1
     assert nodes[0].parameters[-1]["use_sim_time"] is True
     assert nodes[0].parameters[-1]["runtime.image_admission_hz"] == 50.0
+    assert nodes[0].parameters[-1]["vio.max_visual_points_per_voxel"] == 0
     assert "profiles=" in actions[0].msg and "use_sim_time=True" in actions[0].msg
     assert "image_admission_hz=50.0" in actions[0].msg
+    assert "max_visual_points_per_voxel=0" in actions[0].msg
 
 
 def test_image_admission_policy_offline(tmp_path):
@@ -149,6 +163,16 @@ def test_image_admission_launch_override(launch_module, monkeypatch):
     mapping = next(a for a in actions if getattr(a, "executable", None) == "fastlivo_mapping")
     assert mapping.parameters[-1]["runtime.image_admission_hz"] == 10.0
     assert "image_admission_hz=10.0" in actions[0].msg
+
+
+def test_visual_map_cap_launch_override(launch_module, monkeypatch):
+    monkeypatch.setattr(launch_module, "validate_livox_runtime", lambda: "/sensor/lib/typesupport.so")
+    defaults = {a.name: a.default_value for a in launch_module.generate_launch_description() if hasattr(a, "name")}
+    defaults["max_visual_points_per_voxel"] = "64"
+    actions = launch_module.launch_setup(defaults)
+    mapping = next(a for a in actions if getattr(a, "executable", None) == "fastlivo_mapping")
+    assert mapping.parameters[-1]["vio.max_visual_points_per_voxel"] == 64
+    assert "max_visual_points_per_voxel=64" in actions[0].msg
 
 
 def test_livox_runtime_fail_closed(launch_module, monkeypatch, tmp_path):

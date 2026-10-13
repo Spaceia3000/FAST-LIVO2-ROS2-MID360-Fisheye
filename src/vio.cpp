@@ -225,29 +225,37 @@ void VIOManager::getImagePatch(cv::Mat img, V2D pc, float *patch_tmp, int level)
   }
 }
 
-void VIOManager::insertPointIntoVoxelMap(VisualPoint *pt_new)
+bool VIOManager::insertPointIntoVoxelMap(std::unique_ptr<VisualPoint> pt_new)
 {
   V3D pt_w(pt_new->pos_[0], pt_new->pos_[1], pt_new->pos_[2]);
-  double voxel_size = 0.5;
-  float loc_xyz[3];
-  for (int j = 0; j < 3; j++)
-  {
-    loc_xyz[j] = pt_w[j] / voxel_size;
-    if (loc_xyz[j] < 0) { loc_xyz[j] -= 1.0; }
-  }
-  VOXEL_LOCATION position((int64_t)loc_xyz[0], (int64_t)loc_xyz[1], (int64_t)loc_xyz[2]);
+  const auto bucket = visual_map_growth::voxelBucket(pt_w[0], pt_w[1], pt_w[2]);
+  if (!bucket) return false;
+
+  VOXEL_LOCATION position((*bucket)[0], (*bucket)[1], (*bucket)[2]);
   auto iter = feat_map.find(position);
+  const std::size_t voxel_point_count =
+      iter == feat_map.end() ? 0U : iter->second->voxel_points.size();
+  if (!visual_map_growth::bucketAdmits(voxel_point_count, max_visual_points_per_voxel))
+  {
+    return false;
+  }
+
   if (iter != feat_map.end())
   {
-    iter->second->voxel_points.push_back(pt_new);
+    iter->second->voxel_points.push_back(pt_new.get());
+    pt_new.release();
     iter->second->count++;
   }
   else
   {
-    VOXEL_POINTS *ot = new VOXEL_POINTS(0);
-    ot->voxel_points.push_back(pt_new);
-    feat_map[position] = ot;
+    auto new_voxel = std::make_unique<VOXEL_POINTS>(0);
+    const auto inserted = feat_map.emplace(position, new_voxel.get());
+    iter = inserted.first;
+    if (inserted.second) new_voxel.release();
+    iter->second->voxel_points.push_back(pt_new.get());
+    pt_new.release();
   }
+  return true;
 }
 
 void VIOManager::getWarpMatrixAffineHomography(const vk::AbstractCamera &cam, const V2D &px_ref, const V3D &xyz_ref, const V3D &normal_ref,
@@ -876,6 +884,14 @@ void VIOManager::generateVisualMapPoints(cv::Mat img, vector<pointWithVar> &pg)
       pointWithVar pt_var = append_voxel_points[i];
       V3D pt = pt_var.point_w;
 
+      const auto bucket = visual_map_growth::voxelBucket(pt[0], pt[1], pt[2]);
+      if (!bucket) continue;
+      const VOXEL_LOCATION position((*bucket)[0], (*bucket)[1], (*bucket)[2]);
+      const auto voxel = feat_map.find(position);
+      const std::size_t voxel_point_count =
+          voxel == feat_map.end() ? 0U : voxel->second->voxel_points.size();
+      if (!visual_map_growth::bucketAdmits(voxel_point_count, max_visual_points_per_voxel)) continue;
+
       V3D norm_vec(new_frame_->T_f_w_.rotationMatrix() * pt_var.normal);
       V3D dir(new_frame_->T_f_w_ * pt);
       dir.normalize();
@@ -883,18 +899,19 @@ void VIOManager::generateVisualMapPoints(cv::Mat img, vector<pointWithVar> &pg)
       // if(std::fabs(cos_theta)<0.34) continue; // 70 degree
       V2D pc(new_frame_->w2c(pt));
 
-      float *patch = new float[patch_size_total];
-      getImagePatch(img, pc, patch, 0);
+      auto patch = std::make_unique<float[]>(patch_size_total);
+      getImagePatch(img, pc, patch.get(), 0);
 
-      VisualPoint *pt_new = new VisualPoint(pt);
+      auto pt_new = std::make_unique<VisualPoint>(pt);
 
       Vector3d f = cam->cam2world(pc);
-      Feature *ftr_new = new Feature(pt_new, patch, pc, f, new_frame_->T_f_w_, 0);
+      auto ftr_new = std::make_unique<Feature>(pt_new.get(), patch.get(), pc, f, new_frame_->T_f_w_, 0);
+      patch.release();
       ftr_new->img_ = img;
       ftr_new->id_ = new_frame_->id_;
       ftr_new->inv_expo_time_ = state->inv_expo_time;
 
-      pt_new->addFrameRef(ftr_new);
+      pt_new->addFrameRef(ftr_new.release());
       pt_new->covariance_ = pt_var.var;
       pt_new->is_normal_initialized_ = true;
 
@@ -903,8 +920,7 @@ void VIOManager::generateVisualMapPoints(cv::Mat img, vector<pointWithVar> &pg)
       
       pt_new->previous_normal_ = pt_new->normal_;
 
-      insertPointIntoVoxelMap(pt_new);
-      add += 1;
+      if (insertPointIntoVoxelMap(std::move(pt_new))) add += 1;
       // map_cur_frame.push_back(pt_new);
     }
   }

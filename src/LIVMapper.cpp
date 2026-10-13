@@ -105,6 +105,7 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   try_declare.template operator()<int>("vio.patch_pyrimid_level", 4);
   try_declare.template operator()<int>("vio.patch_size", 8);
   try_declare.template operator()<int>("vio.outlier_threshold", 100);
+  try_declare.template operator()<std::int64_t>("vio.max_visual_points_per_voxel", 0);
   try_declare.template operator()<double>("time_offset.exposure_time_init", 0.0);
   try_declare.template operator()<double>("time_offset.img_time_offset", 0.0);
   try_declare.template operator()<bool>("uav.imu_rate_odom", false);
@@ -182,6 +183,11 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   this->node->get_parameter("vio.patch_pyrimid_level", patch_pyrimid_level);
   this->node->get_parameter("vio.patch_size", patch_size);
   this->node->get_parameter("vio.outlier_threshold", outlier_threshold);
+  this->node->get_parameter("vio.max_visual_points_per_voxel", max_visual_points_per_voxel);
+  if (max_visual_points_per_voxel < 0)
+  {
+    throw std::invalid_argument("vio.max_visual_points_per_voxel must be nonnegative");
+  }
   this->node->get_parameter("time_offset.exposure_time_init", exposure_time_init);
   this->node->get_parameter("time_offset.img_time_offset", img_time_offset);
   this->node->get_parameter("time_offset.imu_time_offset", imu_time_offset);
@@ -270,6 +276,7 @@ void LIVMapper::initializeComponents(rclcpp::Node::SharedPtr &node)
   vio_manager->grid_size = grid_size;
   vio_manager->patch_size = patch_size;
   vio_manager->outlier_threshold = outlier_threshold;
+  vio_manager->max_visual_points_per_voxel = max_visual_points_per_voxel;
   vio_manager->setImuToLidarExtrinsic(extT, extR);
   vio_manager->setLidarToCameraExtrinsic(cameraextrinR, cameraextrinT);
   vio_manager->state = &_state;

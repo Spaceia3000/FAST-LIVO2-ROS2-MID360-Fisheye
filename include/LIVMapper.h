@@ -132,6 +132,7 @@ public:
   int lidar_en = 1;
   bool is_first_frame = false;
   int grid_size, patch_size, grid_n_width, grid_n_height, patch_pyrimid_level;
+  std::int64_t max_visual_points_per_voxel = 0;
   int outlier_threshold;
   double plot_time;
   int frame_cnt;
