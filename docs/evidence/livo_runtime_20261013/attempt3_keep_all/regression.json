@@ -1,0 +1,225 @@
+{
+  "passed": true,
+  "scope": "full UGV10 LIVO publication/finite-state regression; no GT or causal closure-accuracy claim",
+  "source_commit": "b8075486fa8fef16254a30b1671df9cf146cce32",
+  "frontend_prefix": "/home/breidy/Documents/fast_livo2_worktrees/imu_validation_20261013/mapping_overlay/install/fast_livo",
+  "backend_prefix": "/home/breidy/Documents/fast_livo2_rtabmap_lc_ws/mvp1_runs/metric_parity_20261013/project_overlay/install",
+  "profile_sha256": "204e244e9776388e03b07219f2dcf2fe4da394f419c77a93fcb94c2cf7bdbb10",
+  "script_sha256": "27ffc645d6f518c27b209ba1c72d0af12beb4164dae219903ff318e27b72643f",
+  "harness_sha256": "c1dabcd77c5d1482cefe32249eb6ef5dadceb75d866b6998dfbebb87da87391b",
+  "input_camera_ends_before_lidar_s": 39.700727824,
+  "input_capture_qos": "Raw inputs and odometry RELIABLE KEEP_ALL VOLATILE; other outputs RELIABLE KEEP_LAST100; clock BEST_EFFORT KEEP_LAST10",
+  "player_transport_override": "Raw topics RELIABLE KEEP_ALL VOLATILE; wait-for-all-acked10000ms; rate0.5 unchanged",
+  "loaded_imu_library": {
+    "path": "/home/breidy/Documents/fast_livo2_worktrees/imu_validation_20261013/mapping_overlay/build/fast_livo/libimu_proc.so",
+    "sha256": "01e2fe9ffa5f63ecb33b519e0afb353a387e936f62144a59c62ab530f639f1c4"
+  },
+  "input_endpoints_before_resume": {
+    "/livox/lidar": {
+      "publishers": [
+        "rosbag2_player"
+      ],
+      "subscribers": [
+        "modular_supervisor_probe",
+        "laserMapping"
+      ]
+    },
+    "/livox/imu": {
+      "publishers": [
+        "rosbag2_player"
+      ],
+      "subscribers": [
+        "modular_supervisor_probe",
+        "laserMapping"
+      ]
+    },
+    "/camera/camera/color/image_raw": {
+      "publishers": [
+        "rosbag2_player"
+      ],
+      "subscribers": [
+        "modular_supervisor_probe",
+        "laserMapping"
+      ]
+    }
+  },
+  "offered_qos_before_resume": {
+    "/livox/lidar": [
+      {
+        "name": "rosbag2_player",
+        "reliability": 1,
+        "durability": 2,
+        "depth": 0,
+        "history": 2
+      }
+    ],
+    "/livox/imu": [
+      {
+        "name": "rosbag2_player",
+        "reliability": 1,
+        "durability": 2,
+        "depth": 0,
+        "history": 2
+      }
+    ],
+    "/camera/camera/color/image_raw": [
+      {
+        "name": "rosbag2_player",
+        "reliability": 1,
+        "durability": 2,
+        "depth": 0,
+        "history": 2
+      }
+    ],
+    "/aft_mapped_to_init": [
+      {
+        "name": "laserMapping",
+        "reliability": 1,
+        "durability": 2,
+        "depth": 10,
+        "history": 1
+      }
+    ],
+    "/cloud_registered": [
+      {
+        "name": "laserMapping",
+        "reliability": 1,
+        "durability": 2,
+        "depth": 100,
+        "history": 1
+      }
+    ],
+    "/cloud_registered_metric": [
+      {
+        "name": "laserMapping",
+        "reliability": 1,
+        "durability": 2,
+        "depth": 100,
+        "history": 1
+      }
+    ],
+    "/rgb_img": [
+      {
+        "name": "laserMapping",
+        "reliability": 1,
+        "durability": 2,
+        "depth": 1,
+        "history": 1
+      }
+    ],
+    "/rtabmap/mapGraph": [
+      {
+        "name": "rtabmap",
+        "reliability": 1,
+        "durability": 1,
+        "depth": 1,
+        "history": 1
+      }
+    ],
+    "/fast_livo2_rtabmap/trajectory_dense": [
+      {
+        "name": "dense_global_trajectory",
+        "reliability": 1,
+        "durability": 1,
+        "depth": 1,
+        "history": 1
+      }
+    ]
+  },
+  "clock_publishers_before_resume": [
+    "rosbag2_player"
+  ],
+  "peak_owned_rss_bytes": 6493417472,
+  "final_dense_exact_odom_sequence": true,
+  "capture_script_sha256": "102589bda165352a04765ec24d9133fad5fe405039dbe2615bab3d6e4fe80ae2",
+  "anchor_consistency": {
+    "graph_poses": 133,
+    "matched": 133,
+    "unmatched_ids": [],
+    "max_translation_m": 2.2894391569017744e-05,
+    "max_rotation_deg": 3.354798136800641e-05,
+    "scope": "Internal optimized graph/dense consistency, not GT accuracy; GetMap2 has no remote epoch."
+  },
+  "final_dense_pose_count": 2994,
+  "final_graph_pose_count": 133,
+  "final_graph_link_counts": {
+    "0": 132,
+    "2": 31
+  },
+  "counts": {
+    "/clock": 12346,
+    "/livox/imu": 37984,
+    "/camera/camera/color/image_raw": 4502,
+    "/livox/lidar": 1899,
+    "/aft_mapped_to_init": 2994,
+    "/cloud_registered_metric": 2994,
+    "/cloud_registered": 5988,
+    "/rtabmap/mapGraph": 150,
+    "/fast_livo2_rtabmap/trajectory_dense": 787,
+    "/rgb_img": 1797
+  },
+  "frames": {
+    "/livox/imu": [
+      "livox_frame"
+    ],
+    "/camera/camera/color/image_raw": [
+      "camera_color_optical_frame"
+    ],
+    "/livox/lidar": [
+      "lidar_link"
+    ],
+    "/aft_mapped_to_init": [
+      "camera_init"
+    ],
+    "/cloud_registered_metric": [
+      "camera_init"
+    ],
+    "/cloud_registered": [
+      "camera_init"
+    ],
+    "/rtabmap/mapGraph": [
+      "map"
+    ],
+    "/fast_livo2_rtabmap/trajectory_dense": [
+      "map"
+    ],
+    "/rgb_img": [
+      ""
+    ]
+  },
+  "first_stamp_ns": {
+    "/clock": 290330382621,
+    "/livox/imu": 290460846410,
+    "/camera/camera/color/image_raw": 290402731573,
+    "/livox/lidar": 290443926766,
+    "/aft_mapped_to_init": 290869707354,
+    "/cloud_registered_metric": 290869707354,
+    "/cloud_registered": 290949105853,
+    "/rtabmap/mapGraph": 290869707354,
+    "/fast_livo2_rtabmap/trajectory_dense": 290869707354,
+    "/rgb_img": 291049106483
+  },
+  "last_stamp_ns": {
+    "/clock": 480424858843,
+    "/livox/imu": 480372700829,
+    "/camera/camera/color/image_raw": 440542912563,
+    "/livox/lidar": 480243640387,
+    "/aft_mapped_to_init": 440509555057,
+    "/cloud_registered_metric": 440509555057,
+    "/cloud_registered": 440787207441,
+    "/rtabmap/mapGraph": 440009192519,
+    "/fast_livo2_rtabmap/trajectory_dense": 440509555057,
+    "/rgb_img": 440787207441
+  },
+  "bad_odom": 0,
+  "duplicate_odom_stamps": 0,
+  "backward_odom_stamps": 0,
+  "nonempty_rgb_clouds": 2448,
+  "xyz_rgb_clouds": 2448,
+  "sampled_unique_rgb": 257,
+  "nonempty_images": 1797,
+  "bad_metric_clouds": 0,
+  "metric_points_checked": 29940192,
+  "wall_seconds": 397.4155714719964,
+  "cleanup_passed": true
+}

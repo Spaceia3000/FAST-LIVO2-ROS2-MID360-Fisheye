@@ -44,6 +44,7 @@ void ImuProcess::Reset()
   angvel_last = Zero3d;
   imu_need_init = true;
   init_iter_num = 1;
+  last_prop_end_time = std::numeric_limits<double>::quiet_NaN();
   IMUpose.clear();
   last_imu.reset(new sensor_msgs::msg::Imu());
   cur_pcl_un_.reset(new PointCloudXYZI());
@@ -563,6 +564,7 @@ void ImuProcess::Process2(LidarMeasureGroup &lidar_meas, StatesGroup &stat, Poin
     if (meas.imu.empty()) { return; };
     /// The very first lidar frame
     IMU_init(meas, stat, init_iter_num);
+    last_prop_end_time = pcl_end_time;
 
     imu_need_init = true;
 

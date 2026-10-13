@@ -1,0 +1,26 @@
+{
+  "/home/breidy/Documents/fast_livo2_worktrees/imu_validation_20261013/before/libimu_proc.so": {
+    "bytes": 121312,
+    "sha256": "515148d8d8ccae7a3c8f6338c8e7c89d4abe70b6957a93df3d50c7fbfa1fd406"
+  },
+  "/home/breidy/Documents/fast_livo2_worktrees/imu_validation_20261013/before/test_imu_initialization_time_origin": {
+    "bytes": 556288,
+    "sha256": "28630ee7d5b954e3f6d5ffea32532dcad16b2c1d22c6b42cca4592ff76b9d76a"
+  },
+  "/home/breidy/Documents/fast_livo2_worktrees/imu_validation_20261013/before/compile_commands.json": {
+    "bytes": 96065,
+    "sha256": "0f1046fcb5ad78623268644b076737ee7887559fe903b64234dd97f92d665aac"
+  },
+  "/home/breidy/Documents/fast_livo2_worktrees/imu_validation_20261013/after/libimu_proc.so": {
+    "bytes": 121312,
+    "sha256": "c50f26a04df20ebf092a57cd7b7146dbbc43b4dbe700f714bb85df792180ca23"
+  },
+  "/home/breidy/Documents/fast_livo2_worktrees/imu_validation_20261013/after/test_imu_initialization_time_origin": {
+    "bytes": 556288,
+    "sha256": "ec6771c6990106df63dc20b31df95356d8e902a700db1b48deb3ad08356812b8"
+  },
+  "/home/breidy/Documents/fast_livo2_worktrees/imu_validation_20261013/after/compile_commands.json": {
+    "bytes": 95124,
+    "sha256": "61803fc3cd66d5e4942e703bb5711b0f20e82c2080444dd18a7f206add8a68a2"
+  }
+}

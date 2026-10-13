@@ -1,0 +1,111 @@
+{
+  "raw_unique_headers": 4502,
+  "fast_log_count": 4476,
+  "raw_headers_missing_from_6decimal_log": [
+    {
+      "index": 7,
+      "header_ns": 290636220881
+    },
+    {
+      "index": 8,
+      "header_ns": 290669576118
+    },
+    {
+      "index": 9,
+      "header_ns": 290702931346
+    },
+    {
+      "index": 10,
+      "header_ns": 290736286566
+    },
+    {
+      "index": 72,
+      "header_ns": 292804381620
+    },
+    {
+      "index": 163,
+      "header_ns": 295839704237
+    },
+    {
+      "index": 166,
+      "header_ns": 295939783503
+    },
+    {
+      "index": 168,
+      "header_ns": 296006503169
+    },
+    {
+      "index": 174,
+      "header_ns": 296206662906
+    },
+    {
+      "index": 475,
+      "header_ns": 306247024650
+    },
+    {
+      "index": 476,
+      "header_ns": 306280382160
+    },
+    {
+      "index": 478,
+      "header_ns": 306347097208
+    },
+    {
+      "index": 566,
+      "header_ns": 309282488807
+    },
+    {
+      "index": 567,
+      "header_ns": 309315845138
+    },
+    {
+      "index": 573,
+      "header_ns": 309515983038
+    },
+    {
+      "index": 1641,
+      "header_ns": 345141674459
+    },
+    {
+      "index": 1704,
+      "header_ns": 347243200218
+    },
+    {
+      "index": 1781,
+      "header_ns": 349811674735
+    },
+    {
+      "index": 1819,
+      "header_ns": 351079212234
+    },
+    {
+      "index": 1823,
+      "header_ns": 351212632772
+    },
+    {
+      "index": 1825,
+      "header_ns": 351279342938
+    },
+    {
+      "index": 1827,
+      "header_ns": 351346053036
+    },
+    {
+      "index": 1828,
+      "header_ns": 351379408059
+    },
+    {
+      "index": 1830,
+      "header_ns": 351446118055
+    },
+    {
+      "index": 1948,
+      "header_ns": 355382279145
+    },
+    {
+      "index": 2426,
+      "header_ns": 371326717507
+    }
+  ],
+  "scope": "Comparison to log after duplicate<1ms filter; timing-only evidence, not direct middleware loss proof. Six-decimal formatting may induce boundary discrepancies."
+}

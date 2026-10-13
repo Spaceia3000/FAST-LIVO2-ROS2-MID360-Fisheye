@@ -371,6 +371,32 @@ if(BUILD_TESTING)
       "${cpp_typesupport_target}"
     )
   endif()
+
+  ament_add_gtest(
+    test_imu_initialization_time_origin
+    test/test_imu_initialization_time_origin.cpp
+  )
+
+  if(TARGET test_imu_initialization_time_origin)
+    ament_target_dependencies(
+      test_imu_initialization_time_origin
+      rclcpp
+      sensor_msgs
+    )
+
+    target_include_directories(
+      test_imu_initialization_time_origin
+      PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EIGEN3_INCLUDE_DIR}
+    )
+
+    target_link_libraries(
+      test_imu_initialization_time_origin
+      imu_proc
+      ${COMMON_DEPENDENCIES}
+    )
+  endif()
 endif()
 
 ament_package()

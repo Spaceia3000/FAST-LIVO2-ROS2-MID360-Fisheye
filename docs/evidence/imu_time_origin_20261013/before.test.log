@@ -1,0 +1,43 @@
+Running main() from /opt/ros/humble/src/gtest_vendor/src/gtest_main.cc
+[==========] Running 2 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 2 tests from ImuInitializationTimeOrigin
+[ RUN      ] ImuInitializationTimeOrigin.UsesLastInitializationMeasurementAtNonzeroEpoch
+[INFO] [1791922799.655183365] []: IMU Initializing: 100.0 %
+[WARN] [1791922799.655201814] []: Reset ImuProcess
+[INFO] [1791922799.655204764] []: IMU Initials: Gravity: -0.0000 -0.0000 9.8100 9.8100; acc covarience: 0.10000000 0.10000000 0.10000000; gry covarience: 0.10000000 0.10000000 0.10000000 
+
+[INFO] [1791922799.655209218] []: IMU Initials: ba covarience: 0.10000000 0.10000000 0.10000000; bg covarience: 0.10000000 0.10000000 0.10000000
+/home/breidy/Documents/fast_livo2_worktrees/imu_init_time_origin_before_20261013/test/test_imu_initialization_time_origin.cpp:111: Failure
+The difference between yaw(state) and 0.1 is 0.10000000000000001, which exceeds 1e-6, where
+yaw(state) evaluates to 0,
+0.1 evaluates to 0.10000000000000001, and
+1e-6 evaluates to 9.9999999999999995e-07.
+[  FAILED  ] ImuInitializationTimeOrigin.UsesLastInitializationMeasurementAtNonzeroEpoch (0 ms)
+[ RUN      ] ImuInitializationTimeOrigin.ResetRebasesAcrossClockRestart
+[INFO] [1791922799.655310622] []: IMU Initializing: 100.0 %
+[WARN] [1791922799.655314975] []: Reset ImuProcess
+[INFO] [1791922799.655316665] []: IMU Initials: Gravity: -0.0000 -0.0000 9.8100 9.8100; acc covarience: 0.10000000 0.10000000 0.10000000; gry covarience: 0.10000000 0.10000000 0.10000000 
+
+[INFO] [1791922799.655319957] []: IMU Initials: ba covarience: 0.10000000 0.10000000 0.10000000; bg covarience: 0.10000000 0.10000000 0.10000000
+[WARN] [1791922799.655335097] []: Reset ImuProcess
+[INFO] [1791922799.655337354] []: IMU Initializing: 100.0 %
+[INFO] [1791922799.655338913] []: IMU Initials: Gravity: -0.0000 -0.0000 9.8100 9.8100; acc covarience: 0.10000000 0.10000000 0.10000000; gry covarience: 0.10000000 0.10000000 0.10000000 
+
+[INFO] [1791922799.655341366] []: IMU Initials: ba covarience: 0.10000000 0.10000000 0.10000000; bg covarience: 0.10000000 0.10000000 0.10000000
+/home/breidy/Documents/fast_livo2_worktrees/imu_init_time_origin_before_20261013/test/test_imu_initialization_time_origin.cpp:135: Failure
+The difference between yaw(state) and 0.05 is 0.050000000000000003, which exceeds 1e-6, where
+yaw(state) evaluates to 0,
+0.05 evaluates to 0.050000000000000003, and
+1e-6 evaluates to 9.9999999999999995e-07.
+[  FAILED  ] ImuInitializationTimeOrigin.ResetRebasesAcrossClockRestart (0 ms)
+[----------] 2 tests from ImuInitializationTimeOrigin (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 2 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 0 tests.
+[  FAILED  ] 2 tests, listed below:
+[  FAILED  ] ImuInitializationTimeOrigin.UsesLastInitializationMeasurementAtNonzeroEpoch
+[  FAILED  ] ImuInitializationTimeOrigin.ResetRebasesAcrossClockRestart
+
+ 2 FAILED TESTS

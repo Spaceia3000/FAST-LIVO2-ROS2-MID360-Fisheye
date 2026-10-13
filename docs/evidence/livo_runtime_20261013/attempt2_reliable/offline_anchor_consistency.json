@@ -1,0 +1,816 @@
+{
+  "scope": "Offline final subscribed MapGraph + saved dense + read-only DB Node.stamp; not terminal GetMap2, no epoch guarantee, no GT accuracy; runtime FAIL unchanged",
+  "graph_poses": 133,
+  "matched": 133,
+  "unmatched_ids": [],
+  "max_translation_m": 1.9748485937002962e-05,
+  "max_rotation_deg": 3.779817059734699e-05,
+  "all_finite": true,
+  "dense_exact_observed_odom": true,
+  "anchors": [
+    {
+      "id": 1,
+      "stamp_ns": 290869707354,
+      "translation_m": 4.429905114332318e-09,
+      "rotation_deg": 0.0
+    },
+    {
+      "id": 19,
+      "stamp_ns": 308882212519,
+      "translation_m": 7.450580596923828e-09,
+      "rotation_deg": 1.7075472925031877e-06
+    },
+    {
+      "id": 20,
+      "stamp_ns": 309882904946,
+      "translation_m": 5.986600622530355e-08,
+      "rotation_deg": 1.7075472925031877e-06
+    },
+    {
+      "id": 21,
+      "stamp_ns": 310883604622,
+      "translation_m": 1.3374777936202467e-07,
+      "rotation_deg": 2.4148365394514667e-06
+    },
+    {
+      "id": 22,
+      "stamp_ns": 311884318886,
+      "translation_m": 4.308471767545033e-07,
+      "rotation_deg": 8.365239156607494e-06
+    },
+    {
+      "id": 23,
+      "stamp_ns": 312885056197,
+      "translation_m": 5.364418029785156e-07,
+      "rotation_deg": 8.365239156607494e-06
+    },
+    {
+      "id": 24,
+      "stamp_ns": 313885772722,
+      "translation_m": 2.4177105336767364e-07,
+      "rotation_deg": 3.4150945850063755e-06
+    },
+    {
+      "id": 25,
+      "stamp_ns": 314886480183,
+      "translation_m": 3.852029429289867e-07,
+      "rotation_deg": 7.2445096183544e-06
+    },
+    {
+      "id": 26,
+      "stamp_ns": 315887221843,
+      "translation_m": 7.645108967921345e-07,
+      "rotation_deg": 5.399738656763832e-06
+    },
+    {
+      "id": 27,
+      "stamp_ns": 316887986737,
+      "translation_m": 9.652456486643342e-07,
+      "rotation_deg": 9.035490975690204e-06
+    },
+    {
+      "id": 28,
+      "stamp_ns": 317889095275,
+      "translation_m": 2.2563330210146547e-06,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 29,
+      "stamp_ns": 318990988028,
+      "translation_m": 2.1492826619270793e-06,
+      "rotation_deg": 1.4080795695456205e-05
+    },
+    {
+      "id": 30,
+      "stamp_ns": 319991558009,
+      "translation_m": 3.5886748369909214e-07,
+      "rotation_deg": 8.365239156607494e-06
+    },
+    {
+      "id": 31,
+      "stamp_ns": 320992148966,
+      "translation_m": 1.1246181883879427e-06,
+      "rotation_deg": 1.3872179782028061e-05
+    },
+    {
+      "id": 32,
+      "stamp_ns": 321992744814,
+      "translation_m": 1.0409503696306335e-06,
+      "rotation_deg": 8.189109132934075e-06
+    },
+    {
+      "id": 33,
+      "stamp_ns": 322993360214,
+      "translation_m": 1.987839477736031e-06,
+      "rotation_deg": 3.4150945850063755e-06
+    },
+    {
+      "id": 34,
+      "stamp_ns": 323993989274,
+      "translation_m": 3.991397789516994e-06,
+      "rotation_deg": 1.870524340221738e-05
+    },
+    {
+      "id": 35,
+      "stamp_ns": 324994662832,
+      "translation_m": 2.1794444678762224e-06,
+      "rotation_deg": 1.3004292747236516e-05
+    },
+    {
+      "id": 36,
+      "stamp_ns": 325995325374,
+      "translation_m": 2.2013408318304285e-06,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 37,
+      "stamp_ns": 326995964005,
+      "translation_m": 2.119948773834555e-06,
+      "rotation_deg": 5.399738656763832e-06
+    },
+    {
+      "id": 38,
+      "stamp_ns": 327996564954,
+      "translation_m": 1.1324882507324219e-06,
+      "rotation_deg": 7.2445096183544e-06
+    },
+    {
+      "id": 39,
+      "stamp_ns": 328997129535,
+      "translation_m": 2.2309979524866226e-06,
+      "rotation_deg": 8.87267600082659e-06
+    },
+    {
+      "id": 40,
+      "stamp_ns": 329997730126,
+      "translation_m": 2.3968183115581393e-06,
+      "rotation_deg": 5.399738656763832e-06
+    },
+    {
+      "id": 41,
+      "stamp_ns": 330998269225,
+      "translation_m": 4.204979902376478e-06,
+      "rotation_deg": 4.829673078902933e-06
+    },
+    {
+      "id": 42,
+      "stamp_ns": 331998808743,
+      "translation_m": 9.765161947079232e-06,
+      "rotation_deg": 9.659346157805868e-06
+    },
+    {
+      "id": 43,
+      "stamp_ns": 332999346193,
+      "translation_m": 1.8039638937022157e-06,
+      "rotation_deg": 4.517745487845101e-06
+    },
+    {
+      "id": 44,
+      "stamp_ns": 334000155859,
+      "translation_m": 7.96675780175166e-06,
+      "rotation_deg": 8.00910673140078e-06
+    },
+    {
+      "id": 45,
+      "stamp_ns": 335001340805,
+      "translation_m": 4.467168312681134e-06,
+      "rotation_deg": 5.915117333884393e-06
+    },
+    {
+      "id": 46,
+      "stamp_ns": 336001977185,
+      "translation_m": 4.53778894202096e-06,
+      "rotation_deg": 4.829673078902933e-06
+    },
+    {
+      "id": 47,
+      "stamp_ns": 337002680521,
+      "translation_m": 2.7418136596679688e-06,
+      "rotation_deg": 5.915117333884393e-06
+    },
+    {
+      "id": 48,
+      "stamp_ns": 338003337124,
+      "translation_m": 1.1689806625491393e-05,
+      "rotation_deg": 5.399738656763832e-06
+    },
+    {
+      "id": 49,
+      "stamp_ns": 339004002110,
+      "translation_m": 8.16300788677692e-06,
+      "rotation_deg": 6.15664931839995e-06
+    },
+    {
+      "id": 50,
+      "stamp_ns": 340004675458,
+      "translation_m": 4.792154131470151e-06,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 51,
+      "stamp_ns": 341005382349,
+      "translation_m": 5.057621821307284e-06,
+      "rotation_deg": 1.3766686389570044e-05
+    },
+    {
+      "id": 52,
+      "stamp_ns": 342006094087,
+      "translation_m": 5.2357175960535405e-06,
+      "rotation_deg": 1.322660445345283e-05
+    },
+    {
+      "id": 53,
+      "stamp_ns": 343006812163,
+      "translation_m": 1.2063720949126092e-05,
+      "rotation_deg": 1.0799477313527668e-05
+    },
+    {
+      "id": 54,
+      "stamp_ns": 344007523315,
+      "translation_m": 5.443310764708936e-06,
+      "rotation_deg": 1.637821826586816e-05
+    },
+    {
+      "id": 55,
+      "stamp_ns": 345008235606,
+      "translation_m": 9.072445674152587e-06,
+      "rotation_deg": 6.389056940260397e-06
+    },
+    {
+      "id": 56,
+      "stamp_ns": 346009000275,
+      "translation_m": 4.586072936456524e-06,
+      "rotation_deg": 5.915117333884393e-06
+    },
+    {
+      "id": 57,
+      "stamp_ns": 347009701317,
+      "translation_m": 9.137996624344254e-06,
+      "rotation_deg": 1.2547858734911242e-05
+    },
+    {
+      "id": 58,
+      "stamp_ns": 348043771976,
+      "translation_m": 6.684229740560621e-06,
+      "rotation_deg": 8.365239156607494e-06
+    },
+    {
+      "id": 59,
+      "stamp_ns": 349044481072,
+      "translation_m": 5.556994448092778e-06,
+      "rotation_deg": 7.636383641665691e-06
+    },
+    {
+      "id": 60,
+      "stamp_ns": 350045171514,
+      "translation_m": 9.716836868436257e-06,
+      "rotation_deg": 5.915117333884393e-06
+    },
+    {
+      "id": 61,
+      "stamp_ns": 351045857056,
+      "translation_m": 5.504320326144789e-06,
+      "rotation_deg": 7.0403978477281e-06
+    },
+    {
+      "id": 62,
+      "stamp_ns": 352046531603,
+      "translation_m": 6.8698070212478205e-06,
+      "rotation_deg": 1.1326587362040635e-05
+    },
+    {
+      "id": 63,
+      "stamp_ns": 353047261594,
+      "translation_m": 1.018524616398517e-05,
+      "rotation_deg": 1.4983666681503321e-05
+    },
+    {
+      "id": 64,
+      "stamp_ns": 354047991088,
+      "translation_m": 9.916608020346366e-06,
+      "rotation_deg": 9.659346157805868e-06
+    },
+    {
+      "id": 65,
+      "stamp_ns": 355048699149,
+      "translation_m": 1.0362297922182431e-05,
+      "rotation_deg": 1.438804923141365e-05
+    },
+    {
+      "id": 66,
+      "stamp_ns": 356049438296,
+      "translation_m": 7.577060977015831e-06,
+      "rotation_deg": 1.9318692315611754e-05
+    },
+    {
+      "id": 67,
+      "stamp_ns": 357050158495,
+      "translation_m": 1.7391487336003193e-05,
+      "rotation_deg": 6.15664931839995e-06
+    },
+    {
+      "id": 68,
+      "stamp_ns": 358050846175,
+      "translation_m": 1.6824988140466072e-05,
+      "rotation_deg": 5.915117333884393e-06
+    },
+    {
+      "id": 69,
+      "stamp_ns": 359051539124,
+      "translation_m": 1.7293155484951583e-05,
+      "rotation_deg": 5.399738656763832e-06
+    },
+    {
+      "id": 70,
+      "stamp_ns": 360052221719,
+      "translation_m": 1.164107858250971e-05,
+      "rotation_deg": 6.15664931839995e-06
+    },
+    {
+      "id": 71,
+      "stamp_ns": 361052911079,
+      "translation_m": 1.0137697041258478e-05,
+      "rotation_deg": 5.399738656763832e-06
+    },
+    {
+      "id": 72,
+      "stamp_ns": 362053614706,
+      "translation_m": 9.584308262940302e-06,
+      "rotation_deg": 3.779817059734699e-05
+    },
+    {
+      "id": 73,
+      "stamp_ns": 363054299180,
+      "translation_m": 8.792442757885825e-06,
+      "rotation_deg": 1.870524340221738e-05
+    },
+    {
+      "id": 74,
+      "stamp_ns": 364055001168,
+      "translation_m": 1.6764064627882907e-05,
+      "rotation_deg": 1.2074182697257337e-05
+    },
+    {
+      "id": 75,
+      "stamp_ns": 365055704583,
+      "translation_m": 7.044452048632697e-06,
+      "rotation_deg": 5.915117333884393e-06
+    },
+    {
+      "id": 76,
+      "stamp_ns": 366056382900,
+      "translation_m": 6.624433512425329e-06,
+      "rotation_deg": 8.00910673140078e-06
+    },
+    {
+      "id": 77,
+      "stamp_ns": 367057064318,
+      "translation_m": 1.681991960950591e-05,
+      "rotation_deg": 3.482726785942526e-05
+    },
+    {
+      "id": 78,
+      "stamp_ns": 368057740127,
+      "translation_m": 9.435624239590115e-06,
+      "rotation_deg": 6.830189170012753e-06
+    },
+    {
+      "id": 79,
+      "stamp_ns": 369058413560,
+      "translation_m": 1.631034028671939e-05,
+      "rotation_deg": 8.00910673140078e-06
+    },
+    {
+      "id": 80,
+      "stamp_ns": 370059133676,
+      "translation_m": 6.217195897295617e-06,
+      "rotation_deg": 1.2547858734911242e-05
+    },
+    {
+      "id": 81,
+      "stamp_ns": 371059860448,
+      "translation_m": 1.592816339790942e-05,
+      "rotation_deg": 5.915117333884393e-06
+    },
+    {
+      "id": 82,
+      "stamp_ns": 372060582688,
+      "translation_m": 6.486782007414241e-06,
+      "rotation_deg": 8.706816964856284e-06
+    },
+    {
+      "id": 83,
+      "stamp_ns": 373061310918,
+      "translation_m": 6.181665498001181e-06,
+      "rotation_deg": 6.613302226726412e-06
+    },
+    {
+      "id": 84,
+      "stamp_ns": 374062030300,
+      "translation_m": 9.371397021786473e-06,
+      "rotation_deg": 2.0773209379101157e-05
+    },
+    {
+      "id": 85,
+      "stamp_ns": 375062758739,
+      "translation_m": 1.9669532775878906e-05,
+      "rotation_deg": 5.915117333884393e-06
+    },
+    {
+      "id": 86,
+      "stamp_ns": 376063500237,
+      "translation_m": 1.9748485937002962e-05,
+      "rotation_deg": 1.2547858734911242e-05
+    },
+    {
+      "id": 87,
+      "stamp_ns": 377264415267,
+      "translation_m": 3.6256089987148165e-06,
+      "rotation_deg": 7.2445096183544e-06
+    },
+    {
+      "id": 88,
+      "stamp_ns": 378265088220,
+      "translation_m": 8.203816668551089e-06,
+      "rotation_deg": 9.507220963046143e-06
+    },
+    {
+      "id": 89,
+      "stamp_ns": 379265782483,
+      "translation_m": 4.985457340795155e-06,
+      "rotation_deg": 6.830189170012753e-06
+    },
+    {
+      "id": 90,
+      "stamp_ns": 380266481160,
+      "translation_m": 8.17952957077429e-06,
+      "rotation_deg": 1.366037834002551e-05
+    },
+    {
+      "id": 91,
+      "stamp_ns": 381267170604,
+      "translation_m": 8.447052830723226e-06,
+      "rotation_deg": 1.2074182697257337e-05
+    },
+    {
+      "id": 92,
+      "stamp_ns": 382267855022,
+      "translation_m": 4.653745006547722e-06,
+      "rotation_deg": 5.122641877509564e-06
+    },
+    {
+      "id": 93,
+      "stamp_ns": 383268543060,
+      "translation_m": 4.493731695406619e-06,
+      "rotation_deg": 7.2445096183544e-06
+    },
+    {
+      "id": 94,
+      "stamp_ns": 384269699252,
+      "translation_m": 4.53778894202096e-06,
+      "rotation_deg": 1.5835142153691186e-05
+    },
+    {
+      "id": 95,
+      "stamp_ns": 385270876309,
+      "translation_m": 1.5538531923092374e-05,
+      "rotation_deg": 2.1327258847706054e-05
+    },
+    {
+      "id": 96,
+      "stamp_ns": 386271487556,
+      "translation_m": 2.7398693405535707e-06,
+      "rotation_deg": 1.2547858734911242e-05
+    },
+    {
+      "id": 97,
+      "stamp_ns": 387272113354,
+      "translation_m": 2.6575919162759727e-06,
+      "rotation_deg": 4.517745487845101e-06
+    },
+    {
+      "id": 98,
+      "stamp_ns": 388272713469,
+      "translation_m": 2.4204183225926104e-06,
+      "rotation_deg": 5.399738656763832e-06
+    },
+    {
+      "id": 99,
+      "stamp_ns": 389273297586,
+      "translation_m": 2.3968183115581393e-06,
+      "rotation_deg": 1.2547858734911242e-05
+    },
+    {
+      "id": 100,
+      "stamp_ns": 390273916004,
+      "translation_m": 2.466941128560886e-06,
+      "rotation_deg": 1.0933637455190003e-05
+    },
+    {
+      "id": 101,
+      "stamp_ns": 391274540596,
+      "translation_m": 4.1265187098195495e-06,
+      "rotation_deg": 1.1581149199548747e-05
+    },
+    {
+      "id": 102,
+      "stamp_ns": 392275153077,
+      "translation_m": 4.212998639839242e-06,
+      "rotation_deg": 4.829673078902933e-06
+    },
+    {
+      "id": 103,
+      "stamp_ns": 393275800273,
+      "translation_m": 2.081900739261267e-06,
+      "rotation_deg": 9.352621701108683e-06
+    },
+    {
+      "id": 104,
+      "stamp_ns": 394276408634,
+      "translation_m": 2.0921145409088427e-06,
+      "rotation_deg": 4.829673078902933e-06
+    },
+    {
+      "id": 105,
+      "stamp_ns": 395276992572,
+      "translation_m": 1.2072699725943264e-06,
+      "rotation_deg": 5.663293681020316e-06
+    },
+    {
+      "id": 106,
+      "stamp_ns": 396277584398,
+      "translation_m": 2.0038599340932657e-06,
+      "rotation_deg": 9.956626120759429e-06
+    },
+    {
+      "id": 107,
+      "stamp_ns": 397278171659,
+      "translation_m": 2.9153008932373514e-06,
+      "rotation_deg": 7.2445096183544e-06
+    },
+    {
+      "id": 108,
+      "stamp_ns": 398278754116,
+      "translation_m": 1.7378229690003959e-06,
+      "rotation_deg": 2.200020789716329e-05
+    },
+    {
+      "id": 109,
+      "stamp_ns": 399279339031,
+      "translation_m": 6.976544803809897e-07,
+      "rotation_deg": 1.527276728333139e-05
+    },
+    {
+      "id": 110,
+      "stamp_ns": 400280188361,
+      "translation_m": 5.4322857062692e-07,
+      "rotation_deg": 8.00910673140078e-06
+    },
+    {
+      "id": 111,
+      "stamp_ns": 401281160758,
+      "translation_m": 4.76837158203125e-07,
+      "rotation_deg": 0.0
+    },
+    {
+      "id": 112,
+      "stamp_ns": 402281857231,
+      "translation_m": 9.537244509839e-07,
+      "rotation_deg": 4.829673078902933e-06
+    },
+    {
+      "id": 113,
+      "stamp_ns": 403282571741,
+      "translation_m": 3.614107619415195e-07,
+      "rotation_deg": 2.4148365394514667e-06
+    },
+    {
+      "id": 114,
+      "stamp_ns": 404283285939,
+      "translation_m": 4.76837158203125e-07,
+      "rotation_deg": 3.4150945850063755e-06
+    },
+    {
+      "id": 115,
+      "stamp_ns": 405284010066,
+      "translation_m": 0.0,
+      "rotation_deg": 6.389056940260397e-06
+    },
+    {
+      "id": 116,
+      "stamp_ns": 406284736665,
+      "translation_m": 5.266248299799052e-07,
+      "rotation_deg": 2.4148365394514667e-06
+    },
+    {
+      "id": 117,
+      "stamp_ns": 407285446483,
+      "translation_m": 3.7997961044311523e-07,
+      "rotation_deg": 3.4150945850063755e-06
+    },
+    {
+      "id": 118,
+      "stamp_ns": 408286148153,
+      "translation_m": 2.751318565982829e-06,
+      "rotation_deg": 1.6199215970291508e-05
+    },
+    {
+      "id": 119,
+      "stamp_ns": 409286860988,
+      "translation_m": 3.058043587168538e-06,
+      "rotation_deg": 3.818191820832845e-06
+    },
+    {
+      "id": 120,
+      "stamp_ns": 410287563643,
+      "translation_m": 1.0798973400588892e-06,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 121,
+      "stamp_ns": 411288252822,
+      "translation_m": 1.4868342498858477e-06,
+      "rotation_deg": 3.818191820832845e-06
+    },
+    {
+      "id": 122,
+      "stamp_ns": 412289006270,
+      "translation_m": 1.1935820814669602e-06,
+      "rotation_deg": 2.9575586669421963e-06
+    },
+    {
+      "id": 123,
+      "stamp_ns": 413289782620,
+      "translation_m": 1.1091109553532836e-06,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 124,
+      "stamp_ns": 414290476759,
+      "translation_m": 1.0798973400588892e-06,
+      "rotation_deg": 3.818191820832845e-06
+    },
+    {
+      "id": 125,
+      "stamp_ns": 415291153226,
+      "translation_m": 2.879743374806177e-06,
+      "rotation_deg": 5.399738656763832e-06
+    },
+    {
+      "id": 126,
+      "stamp_ns": 416291829596,
+      "translation_m": 4.2981520598697533e-07,
+      "rotation_deg": 4.517745487845101e-06
+    },
+    {
+      "id": 127,
+      "stamp_ns": 417292511369,
+      "translation_m": 2.2351741790771484e-07,
+      "rotation_deg": 4.829673078902933e-06
+    },
+    {
+      "id": 128,
+      "stamp_ns": 418293208552,
+      "translation_m": 1.0316296774548874e-06,
+      "rotation_deg": 3.4150945850063755e-06
+    },
+    {
+      "id": 129,
+      "stamp_ns": 419293980067,
+      "translation_m": 4.86061168619993e-07,
+      "rotation_deg": 0.0
+    },
+    {
+      "id": 130,
+      "stamp_ns": 420294781162,
+      "translation_m": 2.9200193199910854e-07,
+      "rotation_deg": 1.7075472925031877e-06
+    },
+    {
+      "id": 131,
+      "stamp_ns": 421295499151,
+      "translation_m": 6.76978629326853e-07,
+      "rotation_deg": 0.0
+    },
+    {
+      "id": 132,
+      "stamp_ns": 422296174216,
+      "translation_m": 5.349911174480987e-07,
+      "rotation_deg": 4.517745487845101e-06
+    },
+    {
+      "id": 133,
+      "stamp_ns": 423296833938,
+      "translation_m": 9.858444277657922e-07,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 134,
+      "stamp_ns": 424297541684,
+      "translation_m": 4.805480091749757e-07,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 135,
+      "stamp_ns": 425298278999,
+      "translation_m": 7.251217997429632e-07,
+      "rotation_deg": 3.4150945850063755e-06
+    },
+    {
+      "id": 136,
+      "stamp_ns": 426298994172,
+      "translation_m": 2.388837865275353e-06,
+      "rotation_deg": 3.818191820832845e-06
+    },
+    {
+      "id": 137,
+      "stamp_ns": 427299735495,
+      "translation_m": 7.539457464619588e-07,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 138,
+      "stamp_ns": 428300505502,
+      "translation_m": 3.9361636593577995e-06,
+      "rotation_deg": 3.818191820832845e-06
+    },
+    {
+      "id": 139,
+      "stamp_ns": 429301328705,
+      "translation_m": 2.3932953492300334e-06,
+      "rotation_deg": 2.4148365394514667e-06
+    },
+    {
+      "id": 140,
+      "stamp_ns": 430302088318,
+      "translation_m": 4.2700602780316664e-06,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 141,
+      "stamp_ns": 431302783101,
+      "translation_m": 2.548577796196737e-06,
+      "rotation_deg": 4.829673078902933e-06
+    },
+    {
+      "id": 142,
+      "stamp_ns": 432303502015,
+      "translation_m": 3.0707963595712804e-06,
+      "rotation_deg": 3.818191820832845e-06
+    },
+    {
+      "id": 143,
+      "stamp_ns": 433304213862,
+      "translation_m": 5.910860723764672e-06,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 144,
+      "stamp_ns": 434304927476,
+      "translation_m": 6.415187858139853e-06,
+      "rotation_deg": 4.182619578303746e-06
+    },
+    {
+      "id": 145,
+      "stamp_ns": 435305672275,
+      "translation_m": 4.306409804389105e-06,
+      "rotation_deg": 0.0
+    },
+    {
+      "id": 146,
+      "stamp_ns": 436306466209,
+      "translation_m": 4.813236530595402e-06,
+      "rotation_deg": 2.9575586669421963e-06
+    },
+    {
+      "id": 147,
+      "stamp_ns": 437307249695,
+      "translation_m": 6.513017835449092e-06,
+      "rotation_deg": 2.9575586669421963e-06
+    },
+    {
+      "id": 148,
+      "stamp_ns": 438307997493,
+      "translation_m": 6.501074534369719e-06,
+      "rotation_deg": 0.0
+    },
+    {
+      "id": 149,
+      "stamp_ns": 439308704272,
+      "translation_m": 4.5876220237955705e-06,
+      "rotation_deg": 0.0
+    },
+    {
+      "id": 150,
+      "stamp_ns": 440309410031,
+      "translation_m": 5.008563794742994e-06,
+      "rotation_deg": 2.4148365394514667e-06
+    }
+  ],
+  "sha256": {
+    "rtabmap.db": "61d8ed37d687a579b915a49139d1cc4ddbdc2b1cabc036e043c1fe42645350d6",
+    "final_mapgraph.cdr": "d10eac73c3212cd8b3a8921b467c34389c7d144ff9fa8b91fa37e1afa93893e2",
+    "final_dense.cdr": "267d4b6c366f04da1d375b78f91ed68014c0448419bb15308fe183de312355ba",
+    "odom.csv": "544fc529987e2fa73e6201acc70705312628b46af3dd7ca23db7de91f7fe247e"
+  }
+}
