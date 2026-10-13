@@ -15,6 +15,7 @@ which is included as part of this source code package.
 
 #include <Eigen/Eigen>
 #include <fstream>
+#include <limits>
 #include "common_lib.h"
 #include <condition_variable>
 #include <nav_msgs/msg/odometry.hpp>
@@ -79,7 +80,7 @@ private:
   V3D mean_gyr;
   V3D angvel_last;
   V3D acc_s_last;
-  double last_prop_end_time;
+  double last_prop_end_time = std::numeric_limits<double>::quiet_NaN();
   double time_last_scan;
   int init_iter_num = 1, MAX_INI_COUNT = 20;
   bool b_first_frame = true;
