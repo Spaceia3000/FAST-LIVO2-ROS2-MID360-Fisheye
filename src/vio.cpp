@@ -367,7 +367,11 @@ void VIOManager::retrieveFromVisualSparseMap(cv::Mat img, vector<pointWithVar> &
 
   float voxel_size = 0.5;
 
-  if (!normal_en) warp_map.clear();
+  if (!normal_en)
+  {
+    for (auto& pair : warp_map) delete pair.second;
+    warp_map.clear();
+  }
 
   cv::Mat depth_img = cv::Mat::zeros(height, width, CV_32FC1);
   float *it = (float *)depth_img.data;
@@ -925,8 +929,6 @@ void VIOManager::updateVisualMapPoints(cv::Mat img)
     V2D pc(new_frame_->w2c(pt->pos_));
     bool add_flag = false;
     
-    float *patch_temp = new float[patch_size_total];
-    getImagePatch(img, pc, patch_temp, 0);
     // TODO: condition: distance and view_angle
     // Step 1: time
     Feature *last_feature = pt->obs_.back();
@@ -956,6 +958,8 @@ void VIOManager::updateVisualMapPoints(cv::Mat img)
     {
       update_num += 1;
       update_flag[i] = 1;
+      float *patch_temp = new float[patch_size_total];
+      getImagePatch(img, pc, patch_temp, 0);
       Vector3d f = cam->cam2world(pc);
       Feature *ftr_new = new Feature(pt, patch_temp, pc, f, new_frame_->T_f_w_, visual_submap->search_levels[i]);
       ftr_new->img_ = img;
