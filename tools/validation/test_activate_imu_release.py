@@ -15,6 +15,7 @@ class AtomicActivationTest(unittest.TestCase):
         activation.WS=self.root;activation.INSTALLED=self.installed
         activation.command=lambda *args:'expected-sha\n'
         activation.mapped_fast=lambda:{}
+        activation.capture_native_artifacts=lambda path:{str(path):activation.sha(path)}
         self.manifest=self.release/'release_manifest.json'
         self.manifest.write_text(json.dumps({'source_sha':'expected-sha','executable':str(self.new),
             'artifacts':{str(self.new):{'sha256':activation.sha(self.new)}}}))

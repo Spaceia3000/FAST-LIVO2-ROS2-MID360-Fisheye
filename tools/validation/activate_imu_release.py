@@ -31,10 +31,27 @@ def atomic_link(target):
         os.replace(name,INSTALLED)
     finally:
         if os.path.lexists(name):os.unlink(name)
-def stage(release,expected):
+def capture_native_artifacts(executable):
+    output=command('ldd',str(executable))
+    required={'liblaser_mapping.so','libvio.so','liblio.so','libpre.so','libimu_proc.so','libutils.so'}
+    artifacts={str(executable):sha(executable)};found=set()
+    if 'not found' in output:raise RuntimeError('Old runtime dependency unresolved')
+    for line in output.splitlines():
+        parts=line.strip().split()
+        if len(parts)>2 and parts[0] in required and parts[1]=='=>':
+            path=P(parts[2]).resolve();artifacts[str(path)]=sha(path);found.add(parts[0])
+    if found!=required:raise RuntimeError('Old native library identity incomplete')
+    return artifacts
+
+def stage(release,expected,runtime_evidence):
     release=release.resolve()
     if release.parent!=WS/'releases':raise RuntimeError('Release outside dedicated release directory')
+    runtime=json.loads(runtime_evidence.read_text())
+    if runtime.get('passed') is not True:raise RuntimeError('Runtime regression must PASS before staging')
     actual=command('git','-C',str(SOURCE),'rev-parse','HEAD').strip()
+    command('git','-C',str(SOURCE),'diff','--quiet')
+    command('git','-C',str(SOURCE),'diff','--cached','--quiet')
+    command('git','-C',str(SOURCE),'diff','--quiet',runtime['source_commit'],actual,'--','src','include','CMakeLists.txt','config','launch')
     if expected!=actual:raise RuntimeError('Production source SHA mismatch')
     executable=release/'build/fast_livo/fastlivo_mapping'
     if not executable.is_file():raise RuntimeError('Missing release executable')
@@ -58,6 +75,8 @@ def stage(release,expected):
         'executable':str(executable),'artifacts':artifacts,'root_dir':str(SOURCE),
         'scope':'Staged release build and ELF bindings verified; this production ROOT_DIR binary was not launched.',
         'native_regression_reference':'docs/evidence/imu_time_origin_20261013',
+        'passing_runtime_evidence':{'path':str(runtime_evidence.resolve()),'sha256':sha(runtime_evidence),'source_commit':runtime['source_commit'],'passed':True},
+        'runtime_source_code_identical_to_production':True,
         'runtime_regression_scope':'Separate isolated build of the same source logic; ROOT_DIR differs.'})
     print(release/'release_manifest.json')
 def activate(manifest):
@@ -67,9 +86,9 @@ def activate(manifest):
     if command('git','-C',str(SOURCE),'rev-parse','HEAD').strip()!=data['source_sha']:raise RuntimeError('Source changed since staging')
     for name,item in data['artifacts'].items():
         if sha(P(name))!=item['sha256']:raise RuntimeError('Artifact hash changed: '+name)
-    old=os.readlink(INSTALLED);old_resolved=INSTALLED.resolve();old_hash=sha(old_resolved)
+    old=os.readlink(INSTALLED);old_resolved=INSTALLED.resolve();old_hash=sha(old_resolved);old_artifacts=capture_native_artifacts(old_resolved)
     activation={'created_utc':utc(),'installed_symlink':str(INSTALLED),'previous_target':old,'previous_resolved':str(old_resolved),
-                'previous_executable_sha256':old_hash,'new_target':data['executable'],'manifest_sha256':sha(manifest),
+                'previous_executable_sha256':old_hash,'previous_native_artifact_hashes':old_artifacts,'new_target':data['executable'],'manifest_sha256':sha(manifest),
                 'mapped_processes_before':mapped_fast(),'scope':'Atomic symlink switch only. Existing mapped binaries/logs untouched; no FAST launch.'}
     target=release/'activation.json'
     if target.exists():raise RuntimeError('Activation evidence already exists')
@@ -77,8 +96,10 @@ def activate(manifest):
     write_new(target,activation)
     atomic_link(data['executable'])
     if INSTALLED.resolve()!=P(data['executable']) or sha(old_resolved)!=old_hash:raise RuntimeError('Activation verification failed')
+    for path,digest in old_artifacts.items():
+        if sha(P(path))!=digest:raise RuntimeError('Original mapped artifact changed: '+path)
     write_new(release/'activation_verified.json',{'verified_utc':utc(),'installed_resolved':str(INSTALLED.resolve()),
-              'old_executable_preserved':True,'mapped_processes_after':mapped_fast()})
+              'old_executable_preserved':True,'old_native_artifact_hashes_preserved':old_artifacts,'mapped_processes_after':mapped_fast()})
     print(target)
 def rollback(record):
     data=json.loads(record.read_text())
@@ -93,11 +114,11 @@ def rollback(record):
 def main():
     ap=argparse.ArgumentParser();group=ap.add_mutually_exclusive_group(required=True)
     group.add_argument('--stage',type=P);group.add_argument('--activate',type=P);group.add_argument('--rollback',type=P)
-    ap.add_argument('--expected-source')
+    ap.add_argument('--expected-source');ap.add_argument('--runtime-evidence',type=P)
     a=ap.parse_args()
     if a.stage:
-        if not a.expected_source:ap.error('--stage requires --expected-source')
-        stage(a.stage,a.expected_source)
+        if not a.expected_source or not a.runtime_evidence:ap.error('--stage requires --expected-source and --runtime-evidence')
+        stage(a.stage,a.expected_source,a.runtime_evidence)
     elif a.activate:activate(a.activate)
     else:rollback(a.rollback)
 if __name__=='__main__':main()
