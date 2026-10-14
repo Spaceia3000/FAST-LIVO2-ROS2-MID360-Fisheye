@@ -1341,6 +1341,7 @@ bool LIVMapper::sync_packages(LidarMeasureGroup &meas)
     sig_buffer.notify_all();
 
     meas.lio_vio_flg = LIO; // process lidar topic, so timestamp should be lidar scan end.
+    meas.measures.clear();
     meas.measures.push_back(m);
     // ROS_INFO("ONlY HAS LiDAR and IMU, NO IMAGE!");
     lidar_pushed = false; // sync one whole lidar scan.
@@ -1537,6 +1538,7 @@ bool LIVMapper::sync_packages(LidarMeasureGroup &meas)
     sig_buffer.notify_all();
     lidar_pushed = false; // sync one whole lidar scan.
     meas.lio_vio_flg = LO; // process lidar topic, so timestamp should be lidar scan end.
+    meas.measures.clear();
     meas.measures.push_back(m);
     return true;
     break;
