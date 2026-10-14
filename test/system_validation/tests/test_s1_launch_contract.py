@@ -54,10 +54,10 @@ def test_invalid_mode(launch_module, mode):
 def test_custom_files_order_without_implicit_overrides(launch_module, tmp_path):
     base = tmp_path / "base.yaml"
     camera = tmp_path / "camera.yaml"
-    base.write_text("/**: {ros__parameters: {common: {img_en: 1, img_topic: /custom}, imu: {imu_en: true}, runtime: {ingest_spin_budget_ms: 7, image_admission_hz: 12.5}}}")
+    base.write_text("/**: {ros__parameters: {common: {img_en: 1, lidar_en: 1, img_topic: /custom}, imu: {imu_en: true}, runtime: {ingest_spin_budget_ms: 7, image_admission_hz: 12.5}}}")
     camera.write_text("/**: {ros__parameters: {camera: {fx: 123.4}, common: {img_en: 1}}}")
     before = [base.read_bytes(), camera.read_bytes()]
-    paths, overrides, topic = launch_module.resolve_contract(REPO, "lo", str(base), str(camera))
+    paths, overrides, topic = launch_module.resolve_contract(REPO, "livo", str(base), str(camera))
     assert paths == [str(base), str(camera)]
     effective = {}
     for path in paths:
@@ -72,6 +72,61 @@ def test_custom_files_order_without_implicit_overrides(launch_module, tmp_path):
     }
     assert "camera.fx" not in overrides and topic == "/custom"
     assert before == [base.read_bytes(), camera.read_bytes()]
+
+
+@pytest.mark.parametrize("mode,profile", [
+    ("lio", "ugv_v1_livo.yaml"),
+    ("lo", "avia.yaml"),
+])
+def test_mismatched_base_profile_fails_closed(launch_module, mode, profile):
+    with pytest.raises(RuntimeError, match="incompatible"):
+        launch_module.resolve_contract(REPO, mode, str(REPO / "config" / profile))
+
+
+def test_camera_profile_cannot_override_mode(launch_module, tmp_path):
+    camera = tmp_path / "camera.yaml"
+    camera.write_text("/**: {ros__parameters: {common: {img_en: 1}}}")
+    with pytest.raises(RuntimeError, match="common.img_en.*incompatible"):
+        launch_module.resolve_contract(REPO, "lio", camera_params_file=str(camera))
+
+
+@pytest.mark.parametrize("parameters,match", [
+    ({"common": {"img_en": 0, "lidar_en": 1}}, "missing mode flag.*imu.imu_en"),
+    ({"common": {"img_en": False, "lidar_en": 1}, "imu": {"imu_en": True}}, "common.img_en.*incompatible"),
+    ({"common": {"img_en": 0, "lidar_en": True}, "imu": {"imu_en": True}}, "common.lidar_en.*incompatible"),
+    ({"common": {"img_en": 0, "lidar_en": 1}, "imu": {"imu_en": 1}}, "imu.imu_en.*incompatible"),
+])
+def test_missing_or_typed_invalid_mode_flags(launch_module, tmp_path, parameters, match):
+    profile = tmp_path / "profile.yaml"
+    profile.write_text(yaml.safe_dump({"/**": {"ros__parameters": parameters}}))
+    with pytest.raises(RuntimeError, match=match):
+        launch_module.resolve_contract(REPO, "lio", str(profile))
+
+
+def test_custom_valid_profile_uses_canonical_flags_from_share(launch_module, tmp_path):
+    share = tmp_path / "share"
+    config = share / "config"
+    config.mkdir(parents=True)
+    canonical = REPO / "config/ugv_v1_lio.yaml"
+    (config / canonical.name).write_bytes(canonical.read_bytes())
+    custom = tmp_path / "custom.yaml"
+    custom.write_text(
+        "/**: {ros__parameters: {common: {img_en: 0, lidar_en: 1, img_topic: /custom}, "
+        "imu: {imu_en: true}, camera: {fx: 123.4}}}"
+    )
+    paths, _, topic = launch_module.resolve_contract(share, "lio", str(custom))
+    assert paths == [str(custom)]
+    assert topic == "/custom"
+
+
+def test_nested_duplicate_yaml_key_is_rejected(launch_module, tmp_path):
+    profile = tmp_path / "duplicate.yaml"
+    profile.write_text(
+        "/**:\n  ros__parameters:\n    common:\n      img_en: 0\n      img_en: 1\n"
+        "      lidar_en: 1\n    imu:\n      imu_en: true\n"
+    )
+    with pytest.raises(RuntimeError, match="Cannot load parameter profile"):
+        launch_module.load_parameters(profile)
 
 
 @pytest.mark.parametrize("kwargs", [

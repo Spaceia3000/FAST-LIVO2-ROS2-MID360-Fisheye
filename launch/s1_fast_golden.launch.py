@@ -12,6 +12,37 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 MODES = ("lo", "lio", "livo")
+MODE_FLAG_KEYS = ("common.img_en", "common.lidar_en", "imu.imu_en")
+
+
+class UniqueKeySafeLoader(yaml.SafeLoader):
+    """Safe YAML loader which rejects duplicate keys at every mapping level."""
+
+    def construct_mapping(self, node, deep=False):
+        self.flatten_mapping(node)
+        mapping = {}
+        for key_node, value_node in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            try:
+                duplicate = key in mapping
+            except TypeError as error:
+                raise yaml.constructor.ConstructorError(
+                    "while constructing a mapping", node.start_mark,
+                    "found an unhashable key", key_node.start_mark,
+                ) from error
+            if duplicate:
+                raise yaml.constructor.ConstructorError(
+                    "while constructing a mapping", node.start_mark,
+                    f"found duplicate key {key!r}", key_node.start_mark,
+                )
+            mapping[key] = self.construct_object(value_node, deep=deep)
+        return mapping
+
+
+UniqueKeySafeLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    UniqueKeySafeLoader.construct_mapping,
+)
 
 
 def validate_livox_runtime():
@@ -32,7 +63,9 @@ def validate_livox_runtime():
 def load_parameters(path):
     """Validate ROS parameter structure without rewriting user parameter files."""
     try:
-        document = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        document = yaml.load(
+            Path(path).read_text(encoding="utf-8"), Loader=UniqueKeySafeLoader,
+        )
     except (OSError, yaml.YAMLError) as error:
         raise RuntimeError(f"Cannot load parameter profile: {path}") from error
     if not isinstance(document, dict) or not document:
@@ -64,6 +97,20 @@ def load_parameters(path):
     return selected
 
 
+def validate_mode_flags(effective, expected, mode):
+    """Require effective mode flags to exactly match the canonical mode profile."""
+    for key in MODE_FLAG_KEYS:
+        if key not in expected or type(expected[key]) not in (bool, int):
+            raise RuntimeError(f"Canonical {mode} profile has invalid mode flag: {key}")
+        if key not in effective:
+            raise RuntimeError(f"Effective parameters are missing mode flag for {mode}: {key}")
+        if type(effective[key]) is not type(expected[key]) or effective[key] != expected[key]:
+            raise RuntimeError(
+                f"Effective mode flag {key}={effective[key]!r} is incompatible with {mode}; "
+                f"canonical value is {expected[key]!r}"
+            )
+
+
 def validate_topic(topic):
     if not re.fullmatch(r"/(?:[A-Za-z_][A-Za-z0-9_]*)(?:/[A-Za-z_][A-Za-z0-9_]*)*", topic):
         raise RuntimeError(f"image_topic must be an absolute ROS topic: {topic!r}")
@@ -77,12 +124,15 @@ def resolve_contract(share, mode="livo", params_file="", camera_params_file="",
         raise RuntimeError(f"invalid input_mode: {input_mode!r}")
     if input_mode == "compressed_direct" and not image_topic:
         raise RuntimeError("compressed_direct requires explicit image_topic")
-    paths = [str(Path(params_file or Path(share) / "config" / f"ugv_v1_{mode}.yaml").resolve())]
+    canonical_path = Path(share) / "config" / f"ugv_v1_{mode}.yaml"
+    expected = load_parameters(canonical_path)
+    paths = [str(Path(params_file or canonical_path).resolve())]
     if camera_params_file:
         paths.append(str(Path(camera_params_file).resolve()))
     effective = {}
     for path in paths:
         effective.update(load_parameters(path))
+    validate_mode_flags(effective, expected, mode)
     topic = image_topic or effective.get("common.img_topic", "/left_camera/image")
     validate_topic(topic)
     overrides = {
