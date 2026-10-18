@@ -11,7 +11,11 @@ from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-MODES = ("lo", "lio", "livo")
+MODE_FLAGS = {
+    "lo": {"common.img_en": 0, "common.lidar_en": 1, "imu.imu_en": False},
+    "lio": {"common.img_en": 0, "common.lidar_en": 1, "imu.imu_en": True},
+    "livo": {"common.img_en": 1, "common.lidar_en": 1, "imu.imu_en": True},
+}
 MODE_FLAG_KEYS = ("common.img_en", "common.lidar_en", "imu.imu_en")
 
 
@@ -116,35 +120,42 @@ def validate_topic(topic):
         raise RuntimeError(f"image_topic must be an absolute ROS topic: {topic!r}")
 
 
-def resolve_contract(share, mode="livo", params_file="", camera_params_file="",
+def resolve_contract(share, mode="ugv_livo.yaml", camera_params_file="",
                      input_mode="raw", image_topic="", use_sim_time=True):
-    if mode not in MODES:
-        raise RuntimeError(f"mode must be exactly lo, lio or livo: {mode!r}")
+    # A single profile filename selects the platform AND the LO/LIO/LIVO modality.
+    # Restrict the operational mode selector to installed config files (no path traversal).
+    if not isinstance(mode, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.yaml", mode):
+        raise RuntimeError(f"mode must be a .yaml filename from package config/: {mode!r}")
     if input_mode not in {"raw", "compressed_direct"}:
         raise RuntimeError(f"invalid input_mode: {input_mode!r}")
     if input_mode == "compressed_direct" and not image_topic:
         raise RuntimeError("compressed_direct requires explicit image_topic")
-    canonical_path = Path(share) / "config" / f"ugv_{mode}.yaml"
-    expected = load_parameters(canonical_path)
-    def config_path(value, default):
-        """Resolve a bare filename from package config, or an explicit absolute path."""
-        if not value:
-            return str(Path(default).resolve())
-        path = Path(value)
+    # Selected YAML is the only source of modality flags.
+    mode_path = (Path(share) / "config" / mode).resolve()
+    mode_params = load_parameters(mode_path)
+    variant = None
+    for candidate, flags in MODE_FLAGS.items():
+        if all(type(mode_params.get(key)) is type(value) and mode_params[key] == value
+               for key, value in flags.items()):
+            variant = candidate
+            break
+    if variant is None:
+        raise RuntimeError(f"Invalid LO/LIO/LIVO mode flags in {mode}")
+
+    def camera_path(name):
+        if not name:
+            name = "camera_realsense.yaml"
+        path = Path(name)
         if path.is_absolute():
             return str(path.resolve())
-        if path.name != value or value in {".", ".."} or not value.endswith(".yaml"):
-            raise RuntimeError("Profile must be a .yaml filename in config/ or an absolute path")
-        return str((Path(share) / "config" / value).resolve())
+        if path.name != name or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.yaml", name):
+            raise RuntimeError("Camera profile must be a .yaml filename in config/ or an absolute path")
+        return str((Path(share) / "config" / name).resolve())
 
-    paths = [
-        config_path(params_file, canonical_path),
-        config_path(camera_params_file, Path(share) / "config" / "camera_realsense.yaml"),
-    ]
-    effective = {}
-    for path in paths:
-        effective.update(load_parameters(path))
-    validate_mode_flags(effective, expected, mode)
+    paths = [str(mode_path), camera_path(camera_params_file)]
+    effective = dict(mode_params)
+    effective.update(load_parameters(paths[1]))
+    validate_mode_flags(effective, MODE_FLAGS[variant], variant)
     topic = image_topic or effective.get("common.img_topic", "/left_camera/image")
     validate_topic(topic)
     overrides = {
@@ -169,7 +180,7 @@ def launch_setup(context):
     sim_time = parse_bool(arg("use_sim_time"))
     use_rviz = parse_bool(arg("use_rviz"))
     paths, overrides, topic = resolve_contract(
-        share, arg("mode"), arg("params_file"), arg("camera_params_file"),
+        share, arg("mode"), arg("camera_params_file"),
         arg("input_mode"), arg("image_topic"), sim_time,
     )
     livox = validate_livox_runtime()
@@ -193,7 +204,7 @@ def launch_setup(context):
 def generate_launch_description():
     share = get_package_share_directory("fast_livo")
     defaults = {
-        "mode": "livo", "params_file": "", "camera_params_file": "",
+        "mode": "ugv_livo.yaml", "camera_params_file": "",
         "input_mode": "raw", "image_topic": "", "use_sim_time": "true",
         "use_rviz": "true",
         "rviz_config": str(Path(share) / "rviz_cfg" / "mapping_ugv.rviz"),

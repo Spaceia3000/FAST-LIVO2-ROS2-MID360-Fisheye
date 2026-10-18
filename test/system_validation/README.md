@@ -18,15 +18,14 @@ The implementation exposes exactly the three modes selected by
 Canonical standalone launch (one FAST node and optional RViz, no HA dependency):
 
 ```bash
-ros2 launch fast_livo mapping_ugv.launch.py mode:=lo
-ros2 launch fast_livo mapping_ugv.launch.py mode:=lio
-ros2 launch fast_livo mapping_ugv.launch.py mode:=livo
+ros2 launch fast_livo mapping_ugv.launch.py mode:=ugv_lo.yaml
+ros2 launch fast_livo mapping_ugv.launch.py mode:=ugv_lio.yaml
+ros2 launch fast_livo mapping_ugv.launch.py mode:=ugv_livo.yaml
 # Explicit parameter files, in order, without implicit mode overrides:
-ros2 launch fast_livo mapping_ugv.launch.py mode:=livo \
-  params_file:=/absolute/path/config/avia.yaml \
-  camera_params_file:=/absolute/path/config/camera_pinhole.yaml
+ros2 launch fast_livo mapping_ugv.launch.py mode:=ugv_livo.yaml \
+  camera_params_file:=camera_pinhole.yaml
 # Native compressed input; no image_transport republisher:
-ros2 launch fast_livo mapping_ugv.launch.py mode:=livo \
+ros2 launch fast_livo mapping_ugv.launch.py mode:=ugv_livo.yaml \
   input_mode:=compressed_direct image_topic:=/camera/image/compressed
 ```
 
@@ -271,3 +270,13 @@ the package config directory. A camera profile is loaded for LO/LIO as well
 because the current FAST-LIVO2 frontend initializes the camera in every mode.
 Sony intrinsics do not establish valid LiDAR-to-Sony extrinsics. The unchanged
 extrin_calib.Rcl/Pcl require separate mounting-specific calibration.
+
+
+## Selecting a platform and LO/LIO/LIVO mode
+The single argument mode selects a YAML filename from the installed package
+config directory. Default: ugv_livo.yaml. Example: mode:=cohemo_livo.yaml.
+Modality is derived from the typed flags in the selected YAML; invalid sensor
+combinations are rejected before FAST-LIVO2 starts. The old params_file launch
+argument is intentionally removed. Camera intrinsics are selected separately
+with camera_params_file (a bare filename from config, or an explicit absolute
+path for controlled external camera profiles).
