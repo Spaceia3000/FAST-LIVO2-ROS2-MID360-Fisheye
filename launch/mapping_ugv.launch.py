@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone S1 FAST modes, native image input, and optional golden RViz."""
+"""Standalone UGV FAST modes, native image input, and optional RViz."""
 import os
 import re
 from pathlib import Path
@@ -162,7 +162,7 @@ def launch_setup(context):
     )
     livox = validate_livox_runtime()
     actions = [LogInfo(msg=(
-        f"S1 FAST: profiles={paths}, mode={arg('mode')}, input_mode={arg('input_mode')}, "
+        f"UGV FAST: profiles={paths}, mode={arg('mode')}, input_mode={arg('input_mode')}, "
         f"image_topic={topic}, use_sim_time={sim_time} (launch argument; "
         f"{'/clock' if sim_time else 'system clock'}), "
         f"livox_typesupport={livox}"
@@ -172,7 +172,7 @@ def launch_setup(context):
         rviz = Path(arg("rviz_config"))
         if not rviz.is_file():
             raise RuntimeError(f"RViz configuration missing: {rviz}")
-        actions.append(Node(package="rviz2", executable="rviz2", name="s1_fast_golden_rviz",
+        actions.append(Node(package="rviz2", executable="rviz2", name="mapping_ugv_rviz",
                             output="screen", arguments=["-d", str(rviz)],
                             parameters=[{"use_sim_time": sim_time}]))
     return actions
@@ -184,7 +184,7 @@ def generate_launch_description():
         "mode": "livo", "params_file": "", "camera_params_file": "",
         "input_mode": "raw", "image_topic": "", "use_sim_time": "true",
         "use_rviz": "true",
-        "rviz_config": str(Path(share) / "rviz_cfg" / "fast_livo2_golden.rviz"),
+        "rviz_config": str(Path(share) / "rviz_cfg" / "mapping_ugv.rviz"),
     }
     return LaunchDescription([
         *[DeclareLaunchArgument(name, default_value=value) for name, value in defaults.items()],

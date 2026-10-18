@@ -18,19 +18,20 @@ The implementation exposes exactly the three modes selected by
 Canonical standalone launch (one FAST node and optional RViz, no HA dependency):
 
 ```bash
-ros2 launch fast_livo s1_fast_golden.launch.py mode:=lo
-ros2 launch fast_livo s1_fast_golden.launch.py mode:=lio
-ros2 launch fast_livo s1_fast_golden.launch.py mode:=livo
+ros2 launch fast_livo mapping_ugv.launch.py mode:=lo
+ros2 launch fast_livo mapping_ugv.launch.py mode:=lio
+ros2 launch fast_livo mapping_ugv.launch.py mode:=livo
 # Explicit parameter files, in order, without implicit mode overrides:
-ros2 launch fast_livo s1_fast_golden.launch.py mode:=livo \
+ros2 launch fast_livo mapping_ugv.launch.py mode:=livo \
   params_file:=/absolute/path/config/avia.yaml \
   camera_params_file:=/absolute/path/config/camera_pinhole.yaml
 # Native compressed input; no image_transport republisher:
-ros2 launch fast_livo s1_fast_golden.launch.py mode:=livo \
+ros2 launch fast_livo mapping_ugv.launch.py mode:=livo \
   input_mode:=compressed_direct image_topic:=/camera/image/compressed
 ```
 
-`use_sim_time` and `use_rviz` default to true. Source the built FAST workspace
+`use_sim_time` and `use_rviz` default to true. Pass `use_rviz:=true` or
+`use_rviz:=false` to enable or disable RViz. Source the built FAST workspace
 and pinned Livox sensor underlay; the launch validates its typesupport without
 starting the driver. Raw input forces `common.enable_image_processing=false`.
 Canonical mode profiles and custom parameter files remain authoritative.
@@ -39,7 +40,7 @@ The existing scientific runner starts `fastlivo_mapping` directly with ordered
 base/camera files and typed overrides. The manifest `launch_file` is profile
 provenance, not a second execution path.
 
-GOLDEN scientific outputs are `/aft_mapped_to_init`,
+UGV scientific outputs are `/aft_mapped_to_init`,
 `/cloud_registered_metric`, `/lidar_measurement_information`, and the `/tf`
 edge `camera_init -> aft_mapped`. Information inherits the odometry header and
 body frame. The metric-cloud gate requires unique, strictly increasing cloud
@@ -49,7 +50,7 @@ stamp, with no duplicate FAST-edge stamps and bit-exact float64 translation and
 quaternion components. `pose_tf_contract` records this check; missing or failed
 TF evidence invalidates the cell. No nearest-neighbor association is used.
 
-The golden RViz configuration uses `camera_init`. `/cloud_registered` is a
+The UGV RViz configuration uses `camera_init`. `/cloud_registered` is a
 legacy/display diagnostic; `/path` and `/rgb_img` are also display outputs,
 not scientific timing truth. RGB may be empty in LO/LIO. Their existing timestamp
 semantics are unchanged.
@@ -107,8 +108,8 @@ export FAST_LIVO2_UGV_DATA_ROOT=~/Documents/datasets/ugv_fast_livo2
 
 Do not point these variables at calibration-only bags. The example records no
 dense cloud by default. `record.cloud_registered: true` preserves the historical
-node-clock-stamped cloud when explicitly required. For an S2-ready capture use
-`record.metric_cloud: true`: the runner enables and records
+node-clock-stamped cloud when explicitly required. For a metric-cloud capture use
+`datasets.metric_cloud.yaml` with `record.metric_cloud: true`: the runner enables and records
 `/cloud_registered_metric`, requires its recorder subscription, and fails
 postflight unless every nonempty metric cloud has one exactly matching odometry
 header stamp and frame. Extra odometry-only updates are valid in LIVO.
@@ -255,3 +256,7 @@ is not corrected here because licensing changes are outside the validation
 scope. No source dataset has been corrected or rewritten. If any data repair is
 later approved, both final PDFs must identify the original, the copy, the exact
 operation, and before/after checksums.
+
+Historical 2026-10-13 IMU origin, LIVO runtime, and activation safety evidence
+was archived after the new launch naming and remains retrievable via Git:
+`git show cf568ad7c8a28e5bd04755578fc13998ee1cfa9a:docs/evidence` (immutable commit `cf568ad`).

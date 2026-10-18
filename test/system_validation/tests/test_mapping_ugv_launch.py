@@ -1,4 +1,4 @@
-"""S1 launch and native publication regression; no bag playback."""
+"""UGV launch and native publication regression; no bag playback."""
 import importlib.util
 import os
 from pathlib import Path
@@ -28,7 +28,7 @@ def launch_module(monkeypatch):
         DeclareLaunchArgument=lambda name, **kw: NS(name=name, **kw), LogInfo=Action, OpaqueFunction=Action))
     monkeypatch.setitem(sys.modules, "launch.substitutions", NS(LaunchConfiguration=Configuration))
     monkeypatch.setitem(sys.modules, "launch_ros.actions", NS(Node=Action))
-    spec = importlib.util.spec_from_file_location("s1_launch", REPO / "launch/s1_fast_golden.launch.py")
+    spec = importlib.util.spec_from_file_location("mapping_ugv_launch", REPO / "launch/mapping_ugv.launch.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -150,7 +150,7 @@ def test_malformed_profile(launch_module, tmp_path, content):
 
 
 def test_missing_profile(launch_module):
-    with pytest.raises(RuntimeError): launch_module.resolve_contract(REPO, params_file="/missing/s1.yaml")
+    with pytest.raises(RuntimeError): launch_module.resolve_contract(REPO, params_file="/missing/ugv.yaml")
 
 
 @pytest.mark.parametrize("rviz", ["true", "false"])
@@ -249,8 +249,8 @@ def test_livox_runtime_fail_closed(launch_module, monkeypatch, tmp_path):
     assert launch_module.validate_livox_runtime().startswith(str(lib))
 
 
-def test_golden_rviz():
-    config = yaml.safe_load((REPO / "rviz_cfg/fast_livo2_golden.rviz").read_text())["Visualization Manager"]
+def test_ugv_rviz():
+    config = yaml.safe_load((REPO / "rviz_cfg/mapping_ugv.rviz").read_text())["Visualization Manager"]
     assert config["Global Options"]["Fixed Frame"] == "camera_init"
     def flatten(displays):
         for item in displays:
@@ -260,7 +260,7 @@ def test_golden_rviz():
     for topic in ("/aft_mapped_to_init", "/path", "/cloud_registered_metric", "/rgb_img"):
         assert any(d.get("Topic", {}).get("Value") == topic and d["Enabled"] for d in displays)
     assert any(d["Class"] == "rviz_default_plugins/TF" for d in displays)
-    assert any("GOLDEN" in d["Name"] and d.get("Topic", {}).get("Value") == "/cloud_registered_metric" for d in displays)
+    assert any("UGV" in d["Name"] and d.get("Topic", {}).get("Value") == "/cloud_registered_metric" for d in displays)
     assert all("diagnostic" in d["Name"] for d in displays if d.get("Topic", {}).get("Value") == "/cloud_registered")
 
 
