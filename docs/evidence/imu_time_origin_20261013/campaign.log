@@ -1,2 +1,0 @@
-before test exit=1
-after test exit=0

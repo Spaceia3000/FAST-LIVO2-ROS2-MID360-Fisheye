@@ -74,7 +74,7 @@ def stage(release,expected,runtime_evidence):
     write_new(release/'release_manifest.json',{'created_utc':utc(),'source_sha':actual,'source_path':str(SOURCE),
         'executable':str(executable),'artifacts':artifacts,'root_dir':str(SOURCE),
         'scope':'Staged release build and ELF bindings verified; this production ROOT_DIR binary was not launched.',
-        'native_regression_reference':'docs/evidence/imu_time_origin_20261013',
+        'native_regression_reference':'https://github.com/Spaceia3000/FAST-LIVO2-ROS2-MID360-Fisheye/tree/cf568ad7c8a28e5bd04755578fc13998ee1cfa9a/docs/evidence/imu_time_origin_20261013',
         'passing_runtime_evidence':{'path':str(runtime_evidence.resolve()),'sha256':sha(runtime_evidence),'source_commit':runtime['source_commit'],'passed':True},
         'runtime_source_code_identical_to_production':True,
         'runtime_regression_scope':'Separate isolated build of the same source logic; ROOT_DIR differs.'})
