@@ -124,11 +124,23 @@ def resolve_contract(share, mode="livo", params_file="", camera_params_file="",
         raise RuntimeError(f"invalid input_mode: {input_mode!r}")
     if input_mode == "compressed_direct" and not image_topic:
         raise RuntimeError("compressed_direct requires explicit image_topic")
-    canonical_path = Path(share) / "config" / f"ugv_v1_{mode}.yaml"
+    canonical_path = Path(share) / "config" / f"ugv_{mode}.yaml"
     expected = load_parameters(canonical_path)
-    paths = [str(Path(params_file or canonical_path).resolve())]
-    if camera_params_file:
-        paths.append(str(Path(camera_params_file).resolve()))
+    def config_path(value, default):
+        """Resolve a bare filename from package config, or an explicit absolute path."""
+        if not value:
+            return str(Path(default).resolve())
+        path = Path(value)
+        if path.is_absolute():
+            return str(path.resolve())
+        if path.name != value or value in {".", ".."} or not value.endswith(".yaml"):
+            raise RuntimeError("Profile must be a .yaml filename in config/ or an absolute path")
+        return str((Path(share) / "config" / value).resolve())
+
+    paths = [
+        config_path(params_file, canonical_path),
+        config_path(camera_params_file, Path(share) / "config" / "camera_realsense.yaml"),
+    ]
     effective = {}
     for path in paths:
         effective.update(load_parameters(path))

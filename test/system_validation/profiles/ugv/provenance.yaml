@@ -10,23 +10,23 @@ equivalent_legacy_source:
   verification: historical_sources_matched_at_import
 files:
   LO:
-    file: config/ugv_v1_lo.yaml
+    file: config/ugv_lo.yaml
     source: /home/breidy/Documents/ham_slam_ws/src/ham_slam/ha_mslam_bringup/config/fast_livo2_ugv_v1_lo.yaml
     equivalent_legacy_source: /home/breidy/Documents/ha_mslam_legacy_ws/src/ha_mslam/ha_mslam_bringup/config/fast_livo2_ugv_v1_lo.yaml
     historical_source_sha256: 0c1efc0d50ff75b24dc287cdae5d31251dc53d7aec943ad756872e4f36c4ab79
-    sha256: 1e6c23997c7a864b32a022632d494ae000d7ec628f9cbe02fb5d94d536c3a607
+    sha256: 3dbaf14bcc9707ef5317410a9bba67d362a1dc401c6b4ad6941222171869fd2d
   LIO:
-    file: config/ugv_v1_lio.yaml
+    file: config/ugv_lio.yaml
     source: /home/breidy/Documents/ham_slam_ws/src/ham_slam/ha_mslam_bringup/config/fast_livo2_ugv_v1_lio.yaml
     equivalent_legacy_source: /home/breidy/Documents/ha_mslam_legacy_ws/src/ha_mslam/ha_mslam_bringup/config/fast_livo2_ugv_v1_lio.yaml
     historical_source_sha256: 9c58bf710884fe55d61af6de46c5204c30f789b2e9fe33d92bc81ca1ecf8ff66
-    sha256: 2a904a82b06baa43d6f5b95f57ede43d0fb863fcd42e5ce43f1a82ad9068af46
+    sha256: 14d24905cfb5d14184894cc2f6167873b95e7a7318680bf0b0404ef9e820ede1
   LIVO:
-    file: config/ugv_v1_livo.yaml
+    file: config/ugv_livo.yaml
     source: /home/breidy/Documents/ham_slam_ws/src/ham_slam/ha_mslam_bringup/config/fast_livo2_ugv_v1_livo.yaml
     equivalent_legacy_source: /home/breidy/Documents/ha_mslam_legacy_ws/src/ha_mslam/ha_mslam_bringup/config/fast_livo2_ugv_v1_livo.yaml
     historical_source_sha256: 204e244e9776388e03b07219f2dcf2fe4da394f419c77a93fcb94c2cf7bdbb10
-    sha256: b468764878c5c0baefea5869ab2fa49a1dd807387cce09ffc116d71da9a0038a
+    sha256: 03c5cdc3df1083d22312188ebabe475f0b0e0ab372aace0d26793e8f9c1707ee
 limitations:
   camera_time_zero: >-
     The derived profiles retain img_time_offset: 0.0 and exposure_time_init: 0.0.
@@ -34,3 +34,11 @@ limitations:
   scope: >-
     These profiles are FAST-LIVO2 parameter inputs only. No HA_MSLAM package,
     launch file, node, binary or runtime dependency is used.
+
+camera_files:
+  realsense:
+    file: config/camera_realsense.yaml
+    sha256: 115e780779aec2ed46fbe423ff10801b7a9033a97577fb41cee1da1cb4976794
+  sony_ev9520l:
+    file: config/camera_sony_ev9520l.yaml
+    sha256: eb38cd3a03d4e0af63059925a58c0a343d68ff9f7d46f74702fed77a5ad6b68f

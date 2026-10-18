@@ -533,7 +533,7 @@ def test_canonical_manifest_profiles_verified(mode):
     manifest = yaml.safe_load((ROOT / "datasets.metric_cloud.yaml").read_text())
     dataset = manifest["datasets"][-1]
     paths = runner.variant_configs(dataset, mode)
-    assert paths[0] == runner.REPO / "config" / f"ugv_v1_{mode.lower()}.yaml"
+    assert paths[0] == runner.REPO / "config" / f"ugv_{mode.lower()}.yaml"
     assert len(runner.verify_vendored_profile_hashes(dataset, mode, paths)["verified_files"]) == 3
 
 

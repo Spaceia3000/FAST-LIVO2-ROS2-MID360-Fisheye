@@ -16,7 +16,11 @@ def generate_launch_description():
     share = get_package_share_directory("fast_livo")
 
     params_default = os.path.join(
-        share, "config", "ugv_v1_livo.yaml"
+        share, "config", "ugv_livo.yaml"
+    )
+
+    camera_default = os.path.join(
+        share, "config", "camera_realsense.yaml"
     )
 
     rviz_default = os.path.join(
@@ -32,6 +36,11 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "params_file",
             default_value=params_default,
+        ),
+
+        DeclareLaunchArgument(
+            "camera_params_file",
+            default_value=camera_default,
         ),
 
         DeclareLaunchArgument(
@@ -56,6 +65,7 @@ def generate_launch_description():
             output="screen",
             parameters=[
                 LaunchConfiguration("params_file"),
+                LaunchConfiguration("camera_params_file"),
                 {"use_sim_time": use_sim_time},
             ],
         ),

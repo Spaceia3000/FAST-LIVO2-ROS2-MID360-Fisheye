@@ -72,7 +72,7 @@ both by JSON Schema and by runtime guards.
 The YAML document is validated inside the runner with
 `jsonschema.Draft202012Validator` before path access or process launch. The
 example contains five official sequences and `ugv_custom_fastlivo2_10`.
-The three canonical UGV profiles are `config/ugv_v1_{lo,lio,livo}.yaml`
+The three canonical UGV profiles are `config/ugv_{lo,lio,livo}.yaml`
 at the repository root, with byte-exact audited content. Their source paths
 and SHA-256 values are recorded in
 `profiles/ugv/provenance.yaml`. Before every UGV cell starts a ROS process,
@@ -260,3 +260,14 @@ operation, and before/after checksums.
 Historical 2026-10-13 IMU origin, LIVO runtime, and activation safety evidence
 was archived after the new launch naming and remains retrievable via Git:
 `git show cf568ad7c8a28e5bd04755578fc13998ee1cfa9a:docs/evidence` (immutable commit `cf568ad`).
+
+
+## UGV camera selection and source-of-truth
+The selected mode profile is ugv_lo.yaml, ugv_lio.yaml, or ugv_livo.yaml.
+Intrinsics live solely in camera_realsense.yaml (640x480) or
+camera_sony_ev9520l.yaml (1280x720). Pass the bare filename using
+camera_params_file:=camera_sony_ev9520l.yaml; the launch resolves it inside
+the package config directory. A camera profile is loaded for LO/LIO as well
+because the current FAST-LIVO2 frontend initializes the camera in every mode.
+Sony intrinsics do not establish valid LiDAR-to-Sony extrinsics. The unchanged
+extrin_calib.Rcl/Pcl require separate mounting-specific calibration.
