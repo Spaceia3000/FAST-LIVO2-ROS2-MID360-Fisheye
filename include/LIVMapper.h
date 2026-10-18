@@ -18,12 +18,15 @@ which is included as part of this source code package.
 #include "preprocess.h"
 #include "fast_livo/msg/lidar_measurement_information.hpp"
 #include "lidar_localizability_calibration_transport.h"
+#include "image_admission.h"
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <vikit/camera_loader.h>
+#include <chrono>
+#include <cstdint>
 
 class LIVMapper
 {
@@ -41,6 +44,7 @@ public:
   void handleLIO();
   void savePCD();
   void processImu();
+  void logIngestDiagnostics();
   
   bool sync_packages(LidarMeasureGroup &meas);
   void prop_imu_once(StatesGroup &imu_prop_state, const double dt, V3D acc_avr, V3D angvel_avr);
@@ -70,7 +74,7 @@ public:
   template <typename T> Eigen::Matrix<T, 3, 1> pointBodyToWorld(const Eigen::Matrix<T, 3, 1> &pi);
   cv::Mat getImageFromMsg(const sensor_msgs::msg::Image::ConstSharedPtr &img_msg);
 
-  std::mutex mtx_buffer, mtx_buffer_imu_prop;
+  std::mutex mtx_buffer, mtx_buffer_imu_prop, mtx_camera_callback;
   std::condition_variable sig_buffer;
 
   SLAM_MODE slam_mode_;
@@ -128,6 +132,7 @@ public:
   int lidar_en = 1;
   bool is_first_frame = false;
   int grid_size, patch_size, grid_n_width, grid_n_height, patch_pyrimid_level;
+  std::int64_t max_visual_points_per_voxel = 0;
   int outlier_threshold;
   double plot_time;
   int frame_cnt;
@@ -207,6 +212,18 @@ public:
   double aver_time_map_inre = 0;
   bool colmap_output_en = false;
   bool enable_image_processing = false; 
+  int ingest_spin_budget_ms = 0;
+  double image_admission_hz = 50.0;
+  double image_admission_interval = 0.02;
+  bool ingest_diagnostics_enabled = false;
+  std::uint64_t camera_accepted_count = 0;
+  std::uint64_t camera_skipped_count = 0;
+  std::uint64_t last_logged_camera_accepted_count = 0;
+  std::uint64_t last_logged_camera_skipped_count = 0;
+  std::chrono::steady_clock::time_point last_imu_reception_time;
+  std::chrono::steady_clock::time_point last_lidar_reception_time;
+  std::chrono::steady_clock::time_point last_img_reception_time;
+  std::chrono::steady_clock::time_point last_ingest_diagnostics_log_time;
   // JPEG decoding callback function
   void jpeg_callback(const sensor_msgs::msg::CompressedImage::SharedPtr msg);
 };

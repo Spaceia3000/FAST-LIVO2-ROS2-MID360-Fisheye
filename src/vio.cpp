@@ -225,29 +225,38 @@ void VIOManager::getImagePatch(cv::Mat img, V2D pc, float *patch_tmp, int level)
   }
 }
 
-void VIOManager::insertPointIntoVoxelMap(VisualPoint *pt_new)
+bool VIOManager::insertPointIntoVoxelMap(std::unique_ptr<VisualPoint> pt_new)
 {
   V3D pt_w(pt_new->pos_[0], pt_new->pos_[1], pt_new->pos_[2]);
-  double voxel_size = 0.5;
-  float loc_xyz[3];
-  for (int j = 0; j < 3; j++)
-  {
-    loc_xyz[j] = pt_w[j] / voxel_size;
-    if (loc_xyz[j] < 0) { loc_xyz[j] -= 1.0; }
-  }
-  VOXEL_LOCATION position((int64_t)loc_xyz[0], (int64_t)loc_xyz[1], (int64_t)loc_xyz[2]);
+  const auto bucket = visual_map_growth::voxelBucket(pt_w[0], pt_w[1], pt_w[2]);
+  if (!bucket) return false;
+
+  VOXEL_LOCATION position((*bucket)[0], (*bucket)[1], (*bucket)[2]);
   auto iter = feat_map.find(position);
+  const std::size_t voxel_point_count =
+      iter == feat_map.end() ? 0U : iter->second->voxel_points.size();
+  if (!visual_map_growth::bucketAdmits(voxel_point_count, max_visual_points_per_voxel))
+  {
+    ++diagnostics_rejected_by_cap_total;
+    return false;
+  }
+
   if (iter != feat_map.end())
   {
-    iter->second->voxel_points.push_back(pt_new);
+    iter->second->voxel_points.push_back(pt_new.get());
+    pt_new.release();
     iter->second->count++;
   }
   else
   {
-    VOXEL_POINTS *ot = new VOXEL_POINTS(0);
-    ot->voxel_points.push_back(pt_new);
-    feat_map[position] = ot;
+    auto new_voxel = std::make_unique<VOXEL_POINTS>(0);
+    const auto inserted = feat_map.emplace(position, new_voxel.get());
+    iter = inserted.first;
+    if (inserted.second) new_voxel.release();
+    iter->second->voxel_points.push_back(pt_new.get());
+    pt_new.release();
   }
+  return true;
 }
 
 void VIOManager::getWarpMatrixAffineHomography(const vk::AbstractCamera &cam, const V2D &px_ref, const V3D &xyz_ref, const V3D &normal_ref,
@@ -352,6 +361,11 @@ double VIOManager::calculateNCC(float *ref_patch, float *cur_patch, int patch_si
 
 void VIOManager::retrieveFromVisualSparseMap(cv::Mat img, vector<pointWithVar> &pg, const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &plane_map)
 {
+  if (diagnostics_enabled)
+  {
+    diagnostics_candidates_direct = 0;
+    diagnostics_candidates_raycast = 0;
+  }
   if (feat_map.size() <= 0) return;
   double ts0 = omp_get_wtime();
 
@@ -367,7 +381,11 @@ void VIOManager::retrieveFromVisualSparseMap(cv::Mat img, vector<pointWithVar> &
 
   float voxel_size = 0.5;
 
-  if (!normal_en) warp_map.clear();
+  if (!normal_en)
+  {
+    for (auto& pair : warp_map) delete pair.second;
+    warp_map.clear();
+  }
 
   cv::Mat depth_img = cv::Mat::zeros(height, width, CV_32FC1);
   float *it = (float *)depth_img.data;
@@ -451,6 +469,7 @@ void VIOManager::retrieveFromVisualSparseMap(cv::Mat img, vector<pointWithVar> &
       bool voxel_in_fov = false;
       std::vector<VisualPoint *> &voxel_points = corre_voxel->second->voxel_points;
       int voxel_num = voxel_points.size();
+      if (diagnostics_enabled) diagnostics_candidates_direct += voxel_points.size();
 
       for (int i = 0; i < voxel_num; i++)
       {
@@ -524,6 +543,7 @@ void VIOManager::retrieveFromVisualSparseMap(cv::Mat img, vector<pointWithVar> &
 
           std::vector<VisualPoint *> &voxel_points = corre_feat_map->second->voxel_points;
           int voxel_num = voxel_points.size();
+          if (diagnostics_enabled) diagnostics_candidates_raycast += voxel_points.size();
           if (voxel_num == 0) continue;
 
           for (int j = 0; j < voxel_num; j++)
@@ -865,6 +885,18 @@ void VIOManager::generateVisualMapPoints(cv::Mat img, vector<pointWithVar> &pg)
       pointWithVar pt_var = append_voxel_points[i];
       V3D pt = pt_var.point_w;
 
+      const auto bucket = visual_map_growth::voxelBucket(pt[0], pt[1], pt[2]);
+      if (!bucket) continue;
+      const VOXEL_LOCATION position((*bucket)[0], (*bucket)[1], (*bucket)[2]);
+      const auto voxel = feat_map.find(position);
+      const std::size_t voxel_point_count =
+          voxel == feat_map.end() ? 0U : voxel->second->voxel_points.size();
+      if (!visual_map_growth::bucketAdmits(voxel_point_count, max_visual_points_per_voxel))
+      {
+        ++diagnostics_rejected_by_cap_total;
+        continue;
+      }
+
       V3D norm_vec(new_frame_->T_f_w_.rotationMatrix() * pt_var.normal);
       V3D dir(new_frame_->T_f_w_ * pt);
       dir.normalize();
@@ -872,18 +904,19 @@ void VIOManager::generateVisualMapPoints(cv::Mat img, vector<pointWithVar> &pg)
       // if(std::fabs(cos_theta)<0.34) continue; // 70 degree
       V2D pc(new_frame_->w2c(pt));
 
-      float *patch = new float[patch_size_total];
-      getImagePatch(img, pc, patch, 0);
+      auto patch = std::make_unique<float[]>(patch_size_total);
+      getImagePatch(img, pc, patch.get(), 0);
 
-      VisualPoint *pt_new = new VisualPoint(pt);
+      auto pt_new = std::make_unique<VisualPoint>(pt);
 
       Vector3d f = cam->cam2world(pc);
-      Feature *ftr_new = new Feature(pt_new, patch, pc, f, new_frame_->T_f_w_, 0);
+      auto ftr_new = std::make_unique<Feature>(pt_new.get(), patch.get(), pc, f, new_frame_->T_f_w_, 0);
+      patch.release();
       ftr_new->img_ = img;
       ftr_new->id_ = new_frame_->id_;
       ftr_new->inv_expo_time_ = state->inv_expo_time;
 
-      pt_new->addFrameRef(ftr_new);
+      pt_new->addFrameRef(ftr_new.release());
       pt_new->covariance_ = pt_var.var;
       pt_new->is_normal_initialized_ = true;
 
@@ -892,8 +925,7 @@ void VIOManager::generateVisualMapPoints(cv::Mat img, vector<pointWithVar> &pg)
       
       pt_new->previous_normal_ = pt_new->normal_;
 
-      insertPointIntoVoxelMap(pt_new);
-      add += 1;
+      if (insertPointIntoVoxelMap(std::move(pt_new))) add += 1;
       // map_cur_frame.push_back(pt_new);
     }
   }
@@ -925,8 +957,6 @@ void VIOManager::updateVisualMapPoints(cv::Mat img)
     V2D pc(new_frame_->w2c(pt->pos_));
     bool add_flag = false;
     
-    float *patch_temp = new float[patch_size_total];
-    getImagePatch(img, pc, patch_temp, 0);
     // TODO: condition: distance and view_angle
     // Step 1: time
     Feature *last_feature = pt->obs_.back();
@@ -956,6 +986,8 @@ void VIOManager::updateVisualMapPoints(cv::Mat img)
     {
       update_num += 1;
       update_flag[i] = 1;
+      float *patch_temp = new float[patch_size_total];
+      getImagePatch(img, pc, patch_temp, 0);
       Vector3d f = cam->cam2world(pc);
       Feature *ftr_new = new Feature(pt, patch_temp, pc, f, new_frame_->T_f_w_, visual_submap->search_levels[i]);
       ftr_new->img_ = img;
@@ -1790,7 +1822,7 @@ void VIOManager::dumpDataForColmap()
   cnt++;
 }
 
-void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &feat_map, double img_time)
+void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &geometric_map, double img_time)
 {
   if (width != img.cols || height != img.rows)
   {
@@ -1810,9 +1842,11 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
 
   double t1 = omp_get_wtime();
 
-  retrieveFromVisualSparseMap(img, pg, feat_map);
+  retrieveFromVisualSparseMap(img, pg, geometric_map);
 
   double t2 = omp_get_wtime();
+
+  if (diagnostics_enabled) diagnostics_retrieve_last_ms = (t2 - t1) * 1000.0;
 
   computeJacobianAndUpdateEKF(img);
 
@@ -1824,7 +1858,7 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
   
   plotTrackedPoints();
 
-  if (plot_flag) projectPatchFromRefToCur(feat_map);
+  if (plot_flag) projectPatchFromRefToCur(geometric_map);
 
   double t5 = omp_get_wtime();
 
@@ -1832,7 +1866,7 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
 
   double t6 = omp_get_wtime();
 
-  updateReferencePatch(feat_map);
+  updateReferencePatch(geometric_map);
 
   double t7 = omp_get_wtime();
   
@@ -1841,7 +1875,7 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
   frame_count++;
   ave_total = ave_total * (frame_count - 1) / frame_count + (t7 - t1 - (t5 - t4)) / frame_count;
 
-  // printf("[ VIO ] feat_map.size(): %zu\n", feat_map.size());
+  // printf("[ VIO ] geometric_map.size(): %zu\n", geometric_map.size());
   // printf("\033[1;32m[ VIO time ]: current frame: retrieveFromVisualSparseMap time: %.6lf secs.\033[0m\n", t2 - t1);
   // printf("\033[1;32m[ VIO time ]: current frame: computeJacobianAndUpdateEKF time: %.6lf secs, comp H: %.6lf secs, ekf: %.6lf secs.\033[0m\n", t3 - t2, computeH, ekf_time);
   // printf("\033[1;32m[ VIO time ]: current frame: generateVisualMapPoints time: %.6lf secs.\033[0m\n", t4 - t3);
@@ -1858,7 +1892,7 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
   printf("\033[1;34m+-------------------------------------------------------------+\033[0m\n");
   printf("\033[1;34m|                         VIO Time                            |\033[0m\n");
   printf("\033[1;34m+-------------------------------------------------------------+\033[0m\n");
-  printf("\033[1;34m| %-29s | %-27zu |\033[0m\n", "Sparse Map Size", feat_map.size());
+  printf("\033[1;34m| %-29s | %-27zu |\033[0m\n", "Geometric Map Size", geometric_map.size());
   printf("\033[1;34m+-------------------------------------------------------------+\033[0m\n");
   printf("\033[1;34m| %-29s | %-27s |\033[0m\n", "Algorithm Stage", "Time (secs)");
   printf("\033[1;34m+-------------------------------------------------------------+\033[0m\n");
@@ -1880,4 +1914,29 @@ void VIOManager::processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unor
   // origin.y = 20;
   // cv::putText(img_cp, text, origin, cv::FONT_HERSHEY_COMPLEX, 0.6, cv::Scalar(255, 255, 255), 1, 8, 0);
   // cv::imwrite("/home/chunran/Desktop/raycasting/" + std::to_string(new_frame_->id_) + ".png", img_cp);
+}
+
+VioDiagnosticsSnapshot VIOManager::diagnosticsSnapshot(std::size_t geometric_voxels) const
+{
+  VioDiagnosticsSnapshot snapshot;
+  snapshot.visual_voxels = this->feat_map.size();
+  for (const auto &voxel : this->feat_map)
+  {
+    if (voxel.second != nullptr)
+    {
+      const std::size_t occupancy = voxel.second->voxel_points.size();
+      snapshot.visual_points += occupancy;
+      if (occupancy > snapshot.max_voxel_occupancy)
+      {
+        snapshot.max_voxel_occupancy = occupancy;
+      }
+    }
+  }
+  snapshot.configured_cap = max_visual_points_per_voxel;
+  snapshot.rejected_by_cap_total = diagnostics_rejected_by_cap_total;
+  snapshot.geometric_voxels = geometric_voxels;
+  snapshot.retrieve_last_ms = diagnostics_retrieve_last_ms;
+  snapshot.candidates_direct = diagnostics_candidates_direct;
+  snapshot.candidates_raycast = diagnostics_candidates_raycast;
+  return snapshot;
 }

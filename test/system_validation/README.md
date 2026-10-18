@@ -21,7 +21,7 @@ Canonical standalone launch (one FAST node and optional RViz, no HA dependency):
 ros2 launch fast_livo s1_fast_golden.launch.py mode:=lo
 ros2 launch fast_livo s1_fast_golden.launch.py mode:=lio
 ros2 launch fast_livo s1_fast_golden.launch.py mode:=livo
-# Official dataset files, in order, followed by authoritative mode overrides:
+# Explicit parameter files, in order, without implicit mode overrides:
 ros2 launch fast_livo s1_fast_golden.launch.py mode:=livo \
   params_file:=/absolute/path/config/avia.yaml \
   camera_params_file:=/absolute/path/config/camera_pinhole.yaml
@@ -33,7 +33,7 @@ ros2 launch fast_livo s1_fast_golden.launch.py mode:=livo \
 `use_sim_time` and `use_rviz` default to true. Source the built FAST workspace
 and pinned Livox sensor underlay; the launch validates its typesupport without
 starting the driver. Raw input forces `common.enable_image_processing=false`.
-Custom parameter files remain intact and mode overrides are applied last.
+Canonical mode profiles and custom parameter files remain authoritative.
 
 The existing scientific runner starts `fastlivo_mapping` directly with ordered
 base/camera files and typed overrides. The manifest `launch_file` is profile

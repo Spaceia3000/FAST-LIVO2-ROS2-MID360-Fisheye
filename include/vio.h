@@ -15,8 +15,11 @@ which is included as part of this source code package.
 
 #include "voxel_map.h"
 #include "feature.h"
+#include "vio_diagnostics.h"
+#include "visual_map_growth.h"
 #include <opencv2/imgproc/imgproc_c.h>
 #include <pcl/filters/voxel_grid.h>
+#include <memory>
 #include <set>
 #include <vikit/math_utils.h>
 #include <vikit/robust_cost.h>
@@ -106,6 +109,8 @@ public:
   double fx, fy, cx, cy;
   int patch_pyrimid_level, patch_size, patch_size_total, patch_size_half, border, warp_len;
   int max_iterations, total_points;
+  // First-in admission cap only; zero preserves unbounded visual-map growth.
+  std::int64_t max_visual_points_per_voxel = 0;
 
   double img_point_cov, outlier_threshold, ncc_thre;
   
@@ -119,6 +124,13 @@ public:
 
   int frame_count = 0;
   bool plot_flag;
+  // Updated only on the mapping thread; per-retrieval counters are reset there.
+  bool diagnostics_enabled = false;
+  double diagnostics_retrieve_last_ms = 0.0;
+  std::uint64_t diagnostics_candidates_direct = 0;
+  std::uint64_t diagnostics_candidates_raycast = 0;
+  // Lifetime total; zero-cap admission never increments it.
+  std::uint64_t diagnostics_rejected_by_cap_total = 0;
 
   Eigen::Matrix<double, DIM_STATE, DIM_STATE> G, H_T_H;
   Eigen::MatrixXd K, H_sub_inv;
@@ -143,7 +155,7 @@ public:
   ~VIOManager();
   void updateStateInverse(cv::Mat img, int level);
   void updateState(cv::Mat img, int level);
-  void processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &feat_map, double img_time);
+  void processFrame(cv::Mat &img, vector<pointWithVar> &pg, const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &geometric_map, double img_time);
   void retrieveFromVisualSparseMap(cv::Mat img, vector<pointWithVar> &pg, const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &plane_map);
   void generateVisualMapPoints(cv::Mat img, vector<pointWithVar> &pg);
   void setImuToLidarExtrinsic(const V3D &transl, const M3D &rot);
@@ -161,13 +173,15 @@ public:
                                      const V3D &xyz_ref, const V3D &normal_ref, const SE3<double> &T_cur_ref, const int level_ref, Matrix2d &A_cur_ref);
   void warpAffine(const Matrix2d &A_cur_ref, const cv::Mat &img_ref, const Vector2d &px_ref, const int level_ref, const int search_level,
                   const int pyramid_level, const int halfpatch_size, float *patch);
-  void insertPointIntoVoxelMap(VisualPoint *pt_new);
+  bool insertPointIntoVoxelMap(std::unique_ptr<VisualPoint> pt_new);
   void plotTrackedPoints();
   void updateFrameState(StatesGroup state);
   void projectPatchFromRefToCur(const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &plane_map);
   void updateReferencePatch(const unordered_map<VOXEL_LOCATION, VoxelOctoTree *> &plane_map);
   void precomputeReferencePatches(int level);
   void dumpDataForColmap();
+  // Walks the visual map; call only from the rate-limited diagnostics path.
+  VioDiagnosticsSnapshot diagnosticsSnapshot(std::size_t geometric_voxels) const;
   double calculateNCC(float *ref_patch, float *cur_patch, int patch_size);
   int getBestSearchLevel(const Matrix2d &A_cur_ref, const int max_level);
   V3F getInterpolatedPixel(cv::Mat img, V2D pc);

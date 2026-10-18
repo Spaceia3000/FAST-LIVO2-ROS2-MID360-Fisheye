@@ -17,10 +17,13 @@
     common:
       img_en: 1
       img_topic: /camera/camera/color/image_raw
-      imu_topic: /livox/imu
-      lid_topic: /livox/lidar
+      imu_topic: /mid360/livox/imu
+      lid_topic: /mid360/livox/lidar
       lidar_en: 1
       ros_driver_bug_fix: false
+    diagnostics:
+      ingest:
+        enabled: false
     evo:
       pose_output_en: false
       seq_name: ugv_v1
@@ -110,6 +113,9 @@
       pub_effect_point_en: false
       pub_plane_en: false
       pub_scan_num: 1
+    runtime:
+      image_admission_hz: 10.0
+      ingest_spin_budget_ms: 5
     time_offset:
       exposure_time_init: 0.0
       img_time_offset: 0.0
@@ -123,6 +129,7 @@
       inv_expo_cov: 0.1
       inverse_composition_en: false
       max_iterations: 5
+      max_visual_points_per_voxel: 64
       normal_en: true
       outlier_threshold: 1000
       patch_pyrimid_level: 4
