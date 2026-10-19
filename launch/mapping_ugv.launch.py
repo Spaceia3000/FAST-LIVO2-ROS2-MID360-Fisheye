@@ -120,7 +120,7 @@ def validate_topic(topic):
         raise RuntimeError(f"image_topic must be an absolute ROS topic: {topic!r}")
 
 
-def resolve_contract(share, mode="ugv_livo.yaml", camera_params_file="",
+def resolve_contract(share, mode="cohemo_livo.yaml", camera_params_file="",
                      input_mode="raw", image_topic="", use_sim_time=True):
     # A single profile filename selects the platform AND the LO/LIO/LIVO modality.
     # Restrict the operational mode selector to installed config files (no path traversal).
@@ -144,7 +144,7 @@ def resolve_contract(share, mode="ugv_livo.yaml", camera_params_file="",
 
     def camera_path(name):
         if not name:
-            name = "camera_realsense.yaml"
+            name = "camera_sony_ev9520l.yaml"
         path = Path(name)
         if path.is_absolute():
             return str(path.resolve())
@@ -204,7 +204,7 @@ def launch_setup(context):
 def generate_launch_description():
     share = get_package_share_directory("fast_livo")
     defaults = {
-        "mode": "ugv_livo.yaml", "camera_params_file": "",
+        "mode": "cohemo_livo.yaml", "camera_params_file": "camera_sony_ev9520l.yaml",
         "input_mode": "raw", "image_topic": "", "use_sim_time": "true",
         "use_rviz": "true",
         "rviz_config": str(Path(share) / "rviz_cfg" / "mapping_ugv.rviz"),
