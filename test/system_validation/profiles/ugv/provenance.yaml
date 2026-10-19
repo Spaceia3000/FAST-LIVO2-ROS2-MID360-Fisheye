@@ -38,7 +38,7 @@ limitations:
 camera_files:
   realsense:
     file: config/camera_realsense.yaml
-    sha256: 115e780779aec2ed46fbe423ff10801b7a9033a97577fb41cee1da1cb4976794
+    sha256: dc6095bc85cf2b84ea5b28da500b893fc3a6f539e4251825085782f29cb0c4cc
   sony_ev9520l:
     file: config/camera_sony_ev9520l.yaml
     sha256: eb38cd3a03d4e0af63059925a58c0a343d68ff9f7d46f74702fed77a5ad6b68f
