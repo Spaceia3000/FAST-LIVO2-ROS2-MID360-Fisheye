@@ -1,44 +1,39 @@
+# Cohemo LIVO: MID-360 LiDAR + internal IMU and Sony FCB-EV9520L.
+# Intrinsics loaded from config/camera_sony_ev9520l.yaml (separate params file).
+# Koide input: supplied calib.json SHA256 2c6916bbcc91194534da2a9ab98781fac375514a6808df9c8993f8c31bfe181d
+# Koide T_lidar_camera = lidar <- camera, quaternion order [qx,qy,qz,qw].
+# FAST-LIVO2 extrin_calib.Rcl/Pcl below = camera <- lidar (inverse Koide).
+# PROVISIONAL until independent LiDAR-camera reprojection/timing validation.
 /**:
   ros__parameters:
-    camera:
-      cx: 329.32513427734375
-      cy: 243.7319793701172
-      d0: 0.0
-      d1: 0.0
-      d2: 0.0
-      d3: 0.0
-      d4: 0.0
-      fx: 607.8380737304688
-      fy: 607.2523193359375
-      height: 480
-      model: Pinhole
-      scale: 1.0
-      width: 640
     common:
-      img_en: 0
-      img_topic: /camera/camera/color/image_raw
+      img_en: 1
+      img_topic: /cam0/image_raw
       imu_topic: /mid360/livox/imu
       lid_topic: /mid360/livox/lidar
       lidar_en: 1
       ros_driver_bug_fix: false
+    diagnostics:
+      ingest:
+        enabled: true
     evo:
       pose_output_en: false
-      seq_name: ugv_v1
+      seq_name: cohemo_livo
     extrin_calib:
       Pcl:
-      - 0.051160572422022266
-      - -0.10015307608455289
-      - -0.025736155048636886
+      - 0.014193501263421
+      - -0.118385521517688
+      - -0.033443592705196
       Rcl:
-      - -0.012648705165646978
-      - -0.9998963733180353
-      - 0.006874073251966595
-      - -0.025684498783597853
-      - -0.006547460933093774
-      - -0.999648656917802
-      - 0.9995900743704234
-      - -0.012820818256666477
-      - -0.0255990202812848
+      - -0.036512120518242
+      - -0.999300700753691
+      - 0.008060677914660
+      - -0.034221085854262
+      - -0.006811048140883
+      - -0.999391078060125
+      - 0.998747106297794
+      - -0.036765732637948
+      - -0.033948469264141
       extrinsic_R:
       - 0.999910200
       - -0.010329711
@@ -110,6 +105,9 @@
       pub_effect_point_en: false
       pub_plane_en: false
       pub_scan_num: 1
+    runtime:
+      image_admission_hz: 5.0
+      ingest_spin_budget_ms: 5
     time_offset:
       exposure_time_init: 0.0
       img_time_offset: 0.0
@@ -123,6 +121,7 @@
       inv_expo_cov: 0.1
       inverse_composition_en: false
       max_iterations: 5
+      max_visual_points_per_voxel: 32
       normal_en: true
       outlier_threshold: 1000
       patch_pyrimid_level: 4

@@ -93,7 +93,7 @@ Visualization Manager:
           Max Intensity: 4096
           Min Color: 0; 0; 0
           Min Intensity: 0
-          Name: GOLDEN metric cloud
+          Name: UGV metric cloud
           Position Transformer: XYZ
           Selectable: true
           Size (Pixels): 4

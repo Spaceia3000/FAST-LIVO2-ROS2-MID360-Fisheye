@@ -153,7 +153,7 @@ def test_mode_commands_use_typed_overrides(monkeypatch, tmp_path):
     assert "localizability.calibration.enabled:=false" in joined
 
 
-def test_metric_cloud_capture_uses_s2_exact_stamp_topic(monkeypatch, tmp_path):
+def test_metric_cloud_capture_uses_exact_stamp_topic(monkeypatch, tmp_path):
     base = tmp_path / "base.yaml"
     camera = tmp_path / "camera.yaml"
     base.write_text("/**: {ros__parameters: {}}", encoding="utf-8")
@@ -530,10 +530,10 @@ def test_tf_recorded_in_every_mode(tmp_path):
 
 @pytest.mark.parametrize("mode", ["LO", "LIO", "LIVO"])
 def test_canonical_manifest_profiles_verified(mode):
-    manifest = yaml.safe_load((ROOT / "datasets.s2_metric_cloud.yaml").read_text())
+    manifest = yaml.safe_load((ROOT / "datasets.metric_cloud.yaml").read_text())
     dataset = manifest["datasets"][-1]
     paths = runner.variant_configs(dataset, mode)
-    assert paths[0] == runner.REPO / "config" / f"ugv_v1_{mode.lower()}.yaml"
+    assert paths[0] == runner.REPO / "config" / f"ugv_{mode.lower()}.yaml"
     assert len(runner.verify_vendored_profile_hashes(dataset, mode, paths)["verified_files"]) == 3
 
 

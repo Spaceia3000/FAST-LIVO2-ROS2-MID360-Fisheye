@@ -1,4 +1,4 @@
-"""S1 launch and native publication regression; no bag playback."""
+"""UGV launch and native publication regression; no bag playback."""
 import importlib.util
 import os
 from pathlib import Path
@@ -28,16 +28,23 @@ def launch_module(monkeypatch):
         DeclareLaunchArgument=lambda name, **kw: NS(name=name, **kw), LogInfo=Action, OpaqueFunction=Action))
     monkeypatch.setitem(sys.modules, "launch.substitutions", NS(LaunchConfiguration=Configuration))
     monkeypatch.setitem(sys.modules, "launch_ros.actions", NS(Node=Action))
-    spec = importlib.util.spec_from_file_location("s1_launch", REPO / "launch/s1_fast_golden.launch.py")
+    spec = importlib.util.spec_from_file_location("mapping_ugv_launch", REPO / "launch/mapping_ugv.launch.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-@pytest.mark.parametrize("mode,img,imu", [("lo", 0, False), ("lio", 0, True), ("livo", 1, True)])
+@pytest.mark.parametrize("mode,img,imu", [
+    ("ugv_lo.yaml", 0, False),
+    ("ugv_lio.yaml", 0, True),
+    ("ugv_livo.yaml", 1, True),
+])
 def test_modes(launch_module, mode, img, imu):
     paths, overrides, _ = launch_module.resolve_contract(REPO, mode)
-    assert paths == [str(REPO / f"config/ugv_v1_{mode}.yaml")]
+    assert paths == [
+        str(REPO / "config" / mode),
+        str(REPO / "config/camera_realsense.yaml"),
+    ]
     profile = launch_module.load_parameters(paths[0])
     assert type(profile["common.img_en"]) is int and profile["common.img_en"] == img
     assert profile["common.lidar_en"] == 1
@@ -45,19 +52,22 @@ def test_modes(launch_module, mode, img, imu):
     assert overrides == {"use_sim_time": True, "common.enable_image_processing": False}
 
 
-@pytest.mark.parametrize("mode", ["LO", "", "unknown", " lio"])
+@pytest.mark.parametrize("mode", ["LO", "", "unknown", " lio", "../ugv_lio.yaml", "/tmp/ugv_livo.yaml", "ugv_livo"])
 def test_invalid_mode(launch_module, mode):
     with pytest.raises(RuntimeError, match="mode must"):
         launch_module.resolve_contract(REPO, mode)
 
 
 def test_custom_files_order_without_implicit_overrides(launch_module, tmp_path):
-    base = tmp_path / "base.yaml"
-    camera = tmp_path / "camera.yaml"
+    share = tmp_path / "share"
+    config_dir = share / "config"
+    config_dir.mkdir(parents=True)
+    base = config_dir / "custom_livo.yaml"
+    camera = config_dir / "camera_custom.yaml"
     base.write_text("/**: {ros__parameters: {common: {img_en: 1, lidar_en: 1, img_topic: /custom}, imu: {imu_en: true}, runtime: {ingest_spin_budget_ms: 7, image_admission_hz: 12.5}}}")
     camera.write_text("/**: {ros__parameters: {camera: {fx: 123.4}, common: {img_en: 1}}}")
     before = [base.read_bytes(), camera.read_bytes()]
-    paths, overrides, topic = launch_module.resolve_contract(REPO, "livo", str(base), str(camera))
+    paths, overrides, topic = launch_module.resolve_contract(share, "custom_livo.yaml", "camera_custom.yaml")
     assert paths == [str(base), str(camera)]
     effective = {}
     for path in paths:
@@ -73,49 +83,48 @@ def test_custom_files_order_without_implicit_overrides(launch_module, tmp_path):
     assert "camera.fx" not in overrides and topic == "/custom"
     assert before == [base.read_bytes(), camera.read_bytes()]
 
-
-@pytest.mark.parametrize("mode,profile", [
-    ("lio", "ugv_v1_livo.yaml"),
-    ("lo", "avia.yaml"),
-])
-def test_mismatched_base_profile_fails_closed(launch_module, mode, profile):
-    with pytest.raises(RuntimeError, match="incompatible"):
-        launch_module.resolve_contract(REPO, mode, str(REPO / "config" / profile))
-
+@pytest.mark.parametrize("profile", ["camera_realsense.yaml", "camera_sony_ev9520l.yaml"])
+def test_mismatched_base_profile_fails_closed(launch_module, profile):
+    with pytest.raises(RuntimeError, match="Invalid LO/LIO/LIVO mode flags"):
+        launch_module.resolve_contract(REPO, profile)
 
 def test_camera_profile_cannot_override_mode(launch_module, tmp_path):
     camera = tmp_path / "camera.yaml"
     camera.write_text("/**: {ros__parameters: {common: {img_en: 1}}}")
     with pytest.raises(RuntimeError, match="common.img_en.*incompatible"):
-        launch_module.resolve_contract(REPO, "lio", camera_params_file=str(camera))
+        launch_module.resolve_contract(REPO, "ugv_lio.yaml", camera_params_file=str(camera))
 
 
-@pytest.mark.parametrize("parameters,match", [
-    ({"common": {"img_en": 0, "lidar_en": 1}}, "missing mode flag.*imu.imu_en"),
-    ({"common": {"img_en": False, "lidar_en": 1}, "imu": {"imu_en": True}}, "common.img_en.*incompatible"),
-    ({"common": {"img_en": 0, "lidar_en": True}, "imu": {"imu_en": True}}, "common.lidar_en.*incompatible"),
-    ({"common": {"img_en": 0, "lidar_en": 1}, "imu": {"imu_en": 1}}, "imu.imu_en.*incompatible"),
+@pytest.mark.parametrize("parameters", [
+    {"common": {"img_en": 0, "lidar_en": 1}},
+    {"common": {"img_en": False, "lidar_en": 1}, "imu": {"imu_en": True}},
+    {"common": {"img_en": 0, "lidar_en": True}, "imu": {"imu_en": True}},
+    {"common": {"img_en": 0, "lidar_en": 1}, "imu": {"imu_en": 1}},
 ])
-def test_missing_or_typed_invalid_mode_flags(launch_module, tmp_path, parameters, match):
-    profile = tmp_path / "profile.yaml"
+def test_missing_or_typed_invalid_mode_flags(launch_module, tmp_path, parameters):
+    config = tmp_path / "config"
+    config.mkdir()
+    profile = config / "bad_lio.yaml"
     profile.write_text(yaml.safe_dump({"/**": {"ros__parameters": parameters}}))
-    with pytest.raises(RuntimeError, match=match):
-        launch_module.resolve_contract(REPO, "lio", str(profile))
-
+    with pytest.raises(RuntimeError, match="Invalid LO/LIO/LIVO mode flags"):
+        launch_module.resolve_contract(tmp_path, "bad_lio.yaml")
 
 def test_custom_valid_profile_uses_canonical_flags_from_share(launch_module, tmp_path):
     share = tmp_path / "share"
     config = share / "config"
     config.mkdir(parents=True)
-    canonical = REPO / "config/ugv_v1_lio.yaml"
+    canonical = REPO / "config/ugv_lio.yaml"
     (config / canonical.name).write_bytes(canonical.read_bytes())
-    custom = tmp_path / "custom.yaml"
+    (config / "camera_realsense.yaml").write_bytes(
+        (REPO / "config/camera_realsense.yaml").read_bytes()
+    )
+    custom = config / "custom_lio.yaml"
     custom.write_text(
         "/**: {ros__parameters: {common: {img_en: 0, lidar_en: 1, img_topic: /custom}, "
         "imu: {imu_en: true}, camera: {fx: 123.4}}}"
     )
-    paths, _, topic = launch_module.resolve_contract(share, "lio", str(custom))
-    assert paths == [str(custom)]
+    paths, _, topic = launch_module.resolve_contract(share, "custom_lio.yaml")
+    assert paths == [str(custom), str(config / "camera_realsense.yaml")]
     assert topic == "/custom"
 
 
@@ -145,21 +154,22 @@ def test_compressed_input(launch_module):
 
 @pytest.mark.parametrize("content", ["[", "[]", "{}", "/**: {}", "/**: {ros__parameters: []}", "/wrong: {ros__parameters: {x: 1}}"])
 def test_malformed_profile(launch_module, tmp_path, content):
-    path = tmp_path / "bad.yaml"; path.write_text(content)
-    with pytest.raises(RuntimeError): launch_module.resolve_contract(REPO, params_file=str(path))
+    config = tmp_path / "config"; config.mkdir()
+    path = config / "bad.yaml"; path.write_text(content)
+    with pytest.raises(RuntimeError): launch_module.resolve_contract(tmp_path, "bad.yaml")
 
 
 def test_missing_profile(launch_module):
-    with pytest.raises(RuntimeError): launch_module.resolve_contract(REPO, params_file="/missing/s1.yaml")
+    with pytest.raises(RuntimeError): launch_module.resolve_contract(REPO, "missing.yaml")
 
 
 @pytest.mark.parametrize("rviz", ["true", "false"])
 def test_launch_processes_and_parameter_order(launch_module, monkeypatch, rviz):
     monkeypatch.setattr(launch_module, "validate_livox_runtime", lambda: "/sensor/lib/typesupport.so")
     defaults = {a.name: a.default_value for a in launch_module.generate_launch_description() if hasattr(a, "name")}
-    assert defaults["mode"] == "livo" and defaults["use_sim_time"] == defaults["use_rviz"] == "true"
+    assert defaults["mode"] == "ugv_livo.yaml" and defaults["use_sim_time"] == defaults["use_rviz"] == "true"
     assert set(defaults) == {
-        "mode", "params_file", "camera_params_file", "input_mode", "image_topic",
+        "mode", "camera_params_file", "input_mode", "image_topic",
         "use_sim_time", "use_rviz", "rviz_config",
     }
     defaults["use_rviz"] = rviz
@@ -167,14 +177,15 @@ def test_launch_processes_and_parameter_order(launch_module, monkeypatch, rviz):
     nodes = [a for a in actions if hasattr(a, "package")]
     assert [(a.package, a.executable) for a in nodes] == [("fast_livo", "fastlivo_mapping")] + ([("rviz2", "rviz2")] if rviz == "true" else [])
     assert nodes[0].parameters == [
-        str(REPO / "config/ugv_v1_livo.yaml"),
+        str(REPO / "config/ugv_livo.yaml"),
+        str(REPO / "config/camera_realsense.yaml"),
         {"use_sim_time": True, "common.enable_image_processing": False},
     ]
     assert "profiles=" in actions[0].msg and "use_sim_time=True" in actions[0].msg
 
 
 def test_livo_yaml_controls_runtime_options(launch_module):
-    profile = launch_module.load_parameters(REPO / "config/ugv_v1_livo.yaml")
+    profile = launch_module.load_parameters(REPO / "config/ugv_livo.yaml")
     assert profile["runtime.ingest_spin_budget_ms"] == 5
     assert profile["runtime.image_admission_hz"] == 10.0
     assert profile["diagnostics.ingest.enabled"] is False
@@ -183,7 +194,7 @@ def test_livo_yaml_controls_runtime_options(launch_module):
 
 def test_cpp_fallbacks_apply_when_yaml_omits_runtime_options(launch_module):
     for mode in ("lo", "lio"):
-        profile = launch_module.load_parameters(REPO / f"config/ugv_v1_{mode}.yaml")
+        profile = launch_module.load_parameters(REPO / f"config/ugv_{mode}.yaml")
         assert "runtime.ingest_spin_budget_ms" not in profile
         assert "runtime.image_admission_hz" not in profile
         assert "diagnostics.ingest.enabled" not in profile
@@ -200,10 +211,14 @@ def test_cpp_fallbacks_apply_when_yaml_omits_runtime_options(launch_module):
 
 def test_canonical_camera_and_extrinsics_match_across_modes(launch_module):
     profiles = [
-        launch_module.load_parameters(REPO / f"config/ugv_v1_{mode}.yaml")
+        launch_module.load_parameters(REPO / f"config/ugv_{mode}.yaml")
         for mode in ("lo", "lio", "livo")
     ]
-    protected = [key for key in profiles[0] if key.startswith(("camera.", "extrin_calib."))]
+    assert all(
+        not any(key.startswith("camera.") for key in profile)
+        for profile in profiles
+    ), "UGV mode profiles must not duplicate camera intrinsics"
+    protected = [key for key in profiles[0] if key.startswith("extrin_calib.")]
     assert protected
     assert all(
         profile[key] == profiles[0][key]
@@ -249,8 +264,8 @@ def test_livox_runtime_fail_closed(launch_module, monkeypatch, tmp_path):
     assert launch_module.validate_livox_runtime().startswith(str(lib))
 
 
-def test_golden_rviz():
-    config = yaml.safe_load((REPO / "rviz_cfg/fast_livo2_golden.rviz").read_text())["Visualization Manager"]
+def test_ugv_rviz():
+    config = yaml.safe_load((REPO / "rviz_cfg/mapping_ugv.rviz").read_text())["Visualization Manager"]
     assert config["Global Options"]["Fixed Frame"] == "camera_init"
     def flatten(displays):
         for item in displays:
@@ -260,7 +275,7 @@ def test_golden_rviz():
     for topic in ("/aft_mapped_to_init", "/path", "/cloud_registered_metric", "/rgb_img"):
         assert any(d.get("Topic", {}).get("Value") == topic and d["Enabled"] for d in displays)
     assert any(d["Class"] == "rviz_default_plugins/TF" for d in displays)
-    assert any("GOLDEN" in d["Name"] and d.get("Topic", {}).get("Value") == "/cloud_registered_metric" for d in displays)
+    assert any("UGV" in d["Name"] and d.get("Topic", {}).get("Value") == "/cloud_registered_metric" for d in displays)
     assert all("diagnostic" in d["Name"] for d in displays if d.get("Topic", {}).get("Value") == "/cloud_registered")
 
 
@@ -286,3 +301,94 @@ def test_native_publication_float64_bit_exact(tmp_path):
     compiled = subprocess.run(["c++", "-std=c++17", *[f"-I{p}" for p in includes], str(probe), "-o", str(binary)], capture_output=True, text=True)
     assert compiled.returncode == 0, compiled.stderr
     subprocess.run([str(binary)], check=True)
+
+@pytest.mark.parametrize("mode", ["ugv_lo.yaml", "ugv_lio.yaml", "ugv_livo.yaml"])
+@pytest.mark.parametrize("camera_name,expected_size", [
+    ("camera_realsense.yaml", (640, 480)),
+    ("camera_sony_ev9520l.yaml", (1280, 720)),
+])
+def test_camera_selected_by_filename_and_mode_contract(launch_module, mode, camera_name, expected_size):
+    paths, overrides, _ = launch_module.resolve_contract(
+        REPO, mode, camera_params_file=camera_name
+    )
+    assert paths == [
+        str(REPO / "config" / mode),
+        str(REPO / "config" / camera_name),
+    ]
+    base = launch_module.load_parameters(paths[0])
+    cam = launch_module.load_parameters(paths[1])
+    assert "camera.model" not in base
+    assert (cam["camera.width"], cam["camera.height"]) == expected_size
+    assert cam["camera.model"] == "Pinhole"
+    for key in ("fx", "fy", "cx", "cy", "d0", "d1", "d2", "d3"):
+        assert f"camera.{key}" in cam
+    assert not any(k.startswith("extrin_calib.") for k in cam)
+    assert "common.img_en" not in cam
+    assert "imu.imu_en" not in overrides
+
+
+def test_bare_mode_filename_uses_package_config(launch_module):
+    paths, _, _ = launch_module.resolve_contract(REPO, "ugv_lio.yaml")
+    assert paths == [
+        str(REPO / "config/ugv_lio.yaml"),
+        str(REPO / "config/camera_realsense.yaml"),
+    ]
+
+
+@pytest.mark.parametrize("bad_name", ["../other.yaml", "./other.yaml", "config/other.yaml", "foo.txt"])
+def test_camera_relative_path_rejected(launch_module, bad_name):
+    with pytest.raises(RuntimeError, match="filename"):
+        launch_module.resolve_contract(REPO, "ugv_livo.yaml", camera_params_file=bad_name)
+
+
+def test_missing_named_camera_fails_closed(launch_module):
+    with pytest.raises(RuntimeError, match="Cannot load parameter profile"):
+        launch_module.resolve_contract(REPO, "ugv_livo.yaml", camera_params_file="camera_unknown.yaml")
+
+
+def test_legacy_livo_launch_declares_both_configs():
+    source = (REPO / "launch/mapping_ugv_livo.launch.py").read_text()
+    assert '"ugv_livo.yaml"' in source
+    assert '"camera_realsense.yaml"' in source
+    assert 'LaunchConfiguration("camera_params_file")' in source
+
+def test_camera_provenance_sha256_matches_versioned_profiles():
+    import hashlib
+    path = REPO / "test/system_validation/profiles/ugv/provenance.yaml"
+    records = yaml.safe_load(path.read_text())["camera_files"]
+    assert set(records) == {"realsense", "sony_ev9520l"}
+    for record in records.values():
+        file = REPO / record["file"]
+        assert file.is_file()
+        assert hashlib.sha256(file.read_bytes()).hexdigest() == record["sha256"]
+
+def test_cohemo_profile_selected_as_mode_filename(launch_module):
+    paths, _, topic = launch_module.resolve_contract(REPO, "cohemo_livo.yaml", "camera_sony_ev9520l.yaml")
+    assert paths == [
+        str(REPO / "config/cohemo_livo.yaml"),
+        str(REPO / "config/camera_sony_ev9520l.yaml"),
+    ]
+    assert topic == "/cam0/image_raw"
+    profile = launch_module.load_parameters(paths[0])
+    assert profile["common.img_en"] == 1
+    assert profile["imu.imu_en"] is True
+
+
+@pytest.mark.parametrize("mode", ["ugv_lo.yaml", "ugv_lio.yaml", "ugv_livo.yaml", "cohemo_livo.yaml"])
+def test_mode_filename_selects_exact_yaml(launch_module, mode):
+    paths, _, _ = launch_module.resolve_contract(REPO, mode)
+    assert Path(paths[0]).name == mode
+
+
+@pytest.mark.parametrize("mode", ["foo.txt", "config/ugv_lo.yaml", "../ugv_lo.yaml", "/tmp/profile.yaml"])
+def test_mode_name_is_not_filesystem_path(launch_module, mode):
+    with pytest.raises(RuntimeError, match="mode must be"):
+        launch_module.resolve_contract(REPO, mode)
+
+
+def test_defaults_expose_no_redundant_params_file(launch_module):
+    defaults = {a.name: a.default_value for a in launch_module.generate_launch_description() if hasattr(a, "name")}
+    assert defaults["mode"] == "ugv_livo.yaml"
+    assert "params_file" not in defaults
+    assert "camera_params_file" in defaults
+    assert defaults["use_rviz"] == "true"

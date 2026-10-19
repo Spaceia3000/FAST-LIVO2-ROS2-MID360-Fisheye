@@ -1,19 +1,5 @@
 /**:
   ros__parameters:
-    camera:
-      cx: 329.32513427734375
-      cy: 243.7319793701172
-      d0: 0.0
-      d1: 0.0
-      d2: 0.0
-      d3: 0.0
-      d4: 0.0
-      fx: 607.8380737304688
-      fy: 607.2523193359375
-      height: 480
-      model: Pinhole
-      scale: 1.0
-      width: 640
     common:
       img_en: 1
       img_topic: /camera/camera/color/image_raw
