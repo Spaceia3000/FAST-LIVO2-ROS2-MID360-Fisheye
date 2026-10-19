@@ -15,7 +15,7 @@
       ros_driver_bug_fix: false
     diagnostics:
       ingest:
-        enabled: false
+        enabled: true
     evo:
       pose_output_en: false
       seq_name: cohemo_livo
