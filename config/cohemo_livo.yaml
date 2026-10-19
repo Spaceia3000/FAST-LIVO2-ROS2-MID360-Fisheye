@@ -90,7 +90,7 @@
       blind: 0.8
       filter_size_surf: 0.1
       lidar_type: 1
-      point_filter_num: 1
+      point_filter_num: 2
       scan_line: 6
     publish:
       blind_rgb_points: 0.0
