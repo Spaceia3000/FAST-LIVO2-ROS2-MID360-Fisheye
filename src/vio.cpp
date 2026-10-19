@@ -11,6 +11,7 @@ which is included as part of this source code package.
 */
 
 #include "vio.h"
+#include <vikit/pinhole_camera.h>
 
 using namespace Eigen;
 VIOManager::VIOManager()
@@ -193,12 +194,45 @@ void VIOManager::computeProjectionJacobian(V3D p, MD(2, 3) & J)
   const double y = p[1];
   const double z_inv = 1. / p[2];
   const double z_inv_2 = z_inv * z_inv;
+  // Preserve the original undistorted projection Jacobian as the exact
+  // zero-distortion path, including non-pinhole camera implementations.
   J(0, 0) = fx * z_inv;
   J(0, 1) = 0.0;
   J(0, 2) = -fx * x * z_inv_2;
   J(1, 0) = 0.0;
   J(1, 1) = fy * z_inv;
   J(1, 2) = -fy * y * z_inv_2;
+
+  // vk::PinholeCamera::world2cam() applies Brown-Conrady radial-tangential
+  // distortion. Its chain-rule derivative must match the coordinates used
+  // for photo-residual sampling, otherwise visual EKF Jacobians are biased.
+  const auto* pinhole = dynamic_cast<const vk::PinholeCamera*>(cam);
+  if (!pinhole) return;
+  const double k1 = pinhole->d0();
+  const double k2 = pinhole->d1();
+  const double p1 = pinhole->d2();
+  const double p2 = pinhole->d3();
+  const double k3 = pinhole->d4();
+  if (k1 == 0.0 && k2 == 0.0 && p1 == 0.0 && p2 == 0.0 && k3 == 0.0) return;
+
+  const double xn = x * z_inv;
+  const double yn = y * z_inv;
+  const double r2 = xn * xn + yn * yn;
+  const double r4 = r2 * r2;
+  const double radial = 1.0 + k1 * r2 + k2 * r4 + k3 * r4 * r2;
+  const double radial_derivative = 2.0 * k1 + 4.0 * k2 * r2 + 6.0 * k3 * r4;
+  const double dx_dx = radial + xn * xn * radial_derivative + 2.0 * p1 * yn + 6.0 * p2 * xn;
+  const double dx_dy = xn * yn * radial_derivative + 2.0 * p1 * xn + 2.0 * p2 * yn;
+  const double dy_dx = dx_dy;
+  const double dy_dy = radial + yn * yn * radial_derivative + 6.0 * p1 * yn + 2.0 * p2 * xn;
+
+  const MD(2, 3) unit_plane_jacobian =
+      (MD(2, 3)() << z_inv, 0.0, -xn * z_inv,
+                      0.0, z_inv, -yn * z_inv).finished();
+  MD(2, 2) distort_jacobian;
+  distort_jacobian << dx_dx, dx_dy, dy_dx, dy_dy;
+  const MD(2, 2) focal_matrix = (MD(2, 2)() << fx, 0.0, 0.0, fy).finished();
+  J = focal_matrix * distort_jacobian * unit_plane_jacobian;
 }
 
 void VIOManager::getImagePatch(cv::Mat img, V2D pc, float *patch_tmp, int level)
