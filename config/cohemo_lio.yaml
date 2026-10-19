@@ -15,7 +15,7 @@
       ros_driver_bug_fix: false
     diagnostics:
       ingest:
-        enabled: false
+        enabled: true
     evo:
       pose_output_en: false
       seq_name: cohemo_lio
@@ -106,7 +106,7 @@
       pub_plane_en: false
       pub_scan_num: 1
     runtime:
-      image_admission_hz: 10.0
+      image_admission_hz: 5.0
       ingest_spin_budget_ms: 5
     time_offset:
       exposure_time_init: 0.0
@@ -121,7 +121,7 @@
       inv_expo_cov: 0.1
       inverse_composition_en: false
       max_iterations: 5
-      max_visual_points_per_voxel: 64
+      max_visual_points_per_voxel: 32
       normal_en: true
       outlier_threshold: 1000
       patch_pyrimid_level: 4
