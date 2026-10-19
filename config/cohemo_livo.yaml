@@ -106,7 +106,7 @@
       pub_plane_en: false
       pub_scan_num: 1
     runtime:
-      image_admission_hz: 5.0
+      image_admission_hz: 20.0
       ingest_spin_budget_ms: 5
     time_offset:
       exposure_time_init: 0.0
