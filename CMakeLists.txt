@@ -102,6 +102,12 @@ find_package(OpenCV REQUIRED)
 find_package(Sophus REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread)
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_livo_camera_fallback test/test_livo_camera_fallback.cpp)
+  target_include_directories(test_livo_camera_fallback PRIVATE include)
+endif()
+
 
 # Generate FAST-LIVO2 ROS 2 transport interfaces.
 rosidl_generate_interfaces(

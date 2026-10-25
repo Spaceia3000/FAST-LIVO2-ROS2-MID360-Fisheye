@@ -108,6 +108,7 @@
     runtime:
       image_admission_hz: 5.0
       ingest_spin_budget_ms: 5
+      livo_camera_wait_sensor_s: 0.30
     time_offset:
       exposure_time_init: 0.0
       img_time_offset: 0.0

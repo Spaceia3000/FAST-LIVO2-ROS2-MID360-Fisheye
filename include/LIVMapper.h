@@ -19,6 +19,7 @@ which is included as part of this source code package.
 #include "fast_livo/msg/lidar_measurement_information.hpp"
 #include "lidar_localizability_calibration_transport.h"
 #include "image_admission.h"
+#include "livo_camera_fallback.h"
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.hpp>
 #include <tf2_ros/transform_broadcaster.h>
@@ -47,6 +48,10 @@ public:
   void logIngestDiagnostics();
   
   bool sync_packages(LidarMeasureGroup &meas);
+  bool prepareLivoLioCut(
+      LidarMeasureGroup &meas,
+      double cut_time,
+      bool include_cut_endpoint);
   void prop_imu_once(StatesGroup &imu_prop_state, const double dt, V3D acc_avr, V3D angvel_avr);
   void imu_prop_callback();
   void transformLidar(const Eigen::Matrix3d rot, const Eigen::Vector3d t, const PointCloudXYZI::Ptr &input_cloud, PointCloudXYZI::Ptr &trans_cloud);
@@ -215,11 +220,16 @@ public:
   int ingest_spin_budget_ms = 0;
   double image_admission_hz = 50.0;
   double image_admission_interval = 0.02;
+  double livo_camera_wait_sensor_s = 0.0;
+  double livo_last_sensor_cut_time = -1.0;
   bool ingest_diagnostics_enabled = false;
   std::uint64_t camera_accepted_count = 0;
   std::uint64_t camera_skipped_count = 0;
   std::uint64_t last_logged_camera_accepted_count = 0;
   std::uint64_t last_logged_camera_skipped_count = 0;
+  bool livo_camera_fallback_active = false;
+  std::uint64_t livo_camera_fallback_lio_count = 0;
+  std::uint64_t livo_camera_stale_image_count = 0;
   std::chrono::steady_clock::time_point last_imu_reception_time;
   std::chrono::steady_clock::time_point last_lidar_reception_time;
   std::chrono::steady_clock::time_point last_img_reception_time;
