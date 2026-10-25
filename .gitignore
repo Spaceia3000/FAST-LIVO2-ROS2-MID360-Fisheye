@@ -1,2 +1,7 @@
-build/*
-Log/*.txt
+build/
+install/
+log/
+Log/*
+!Log/.gitkeep
+__pycache__/
+*.pyc

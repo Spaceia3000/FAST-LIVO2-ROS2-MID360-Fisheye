@@ -1,185 +1,127 @@
-# FAST-LIVO2 ROS2 HUMBLE
+# Cohemos — FAST-LIVO2 para UGV (ROS 2 Humble)
 
-## FAST-LIVO2: Fast, Direct LiDAR-Inertial-Visual Odometry
+Repositorio: https://github.com/Spaceia3000/FAST-LIVO2-ROS2-MID360-Fisheye (rama **Cohemos**).
 
-### :star: Acknowledgments
+Este paquete contiene el frontend LiDAR/IMU/Sony. El backend de cierre de lazo se instala desde https://github.com/Spaceia3000/simple_loop_closure (también rama **Cohemos**). El driver MID-360, la adquisición de imágenes Sony y las librerías Vikit son dependencias externas; no vienen dentro de estos dos repositorios.
 
-This project extends the following open-source contributions:
+## Matriz de dependencias y versiones
 
-- **Original work**: [FAST-LIVO2](https://github.com/hku-mars/FAST-LIVO2) by Chunran Zheng (HKU MARS Lab).
-- **ROS2 Humble port**: [FAST-LIVO2/tree/humble](https://github.com/Robotic-Developer-Road/FAST-LIVO2/tree/humble) by Robotic-Developer-Road.
+Referencias **medidas en la laptop** el 19/10/2026. Ubuntu 22.04.5 LTS x86_64, ROS 2 Humble, Python 3.10.12, GCC 11.4.0, C++17. No son versiones ya validadas en la Jetson ARM64.
 
-### 📢 News
+| Librería o repositorio | Versión/commit observado | Fuente |
+|---|---|---|
+| ROS 2 Humble | ros-humble-ros-base **0.10.0** | https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html |
+| rclcpp | **16.0.21** | Paquete ros-humble-rclcpp |
+| OpenCV / cv_bridge | **4.5.4 / 3.2.1** | libopencv-dev / ros-humble-cv-bridge |
+| PCL / pcl_ros | **1.12.1 / 2.4.5** | libpcl-dev / ros-humble-pcl-ros |
+| Eigen / Boost / fmt | **3.4.0 / 1.74 / 8.1.1** | libeigen3-dev / libboost-dev / libfmt-dev |
+| Sophus | **1.22.9102** | ros-humble-sophus, CMake desde /opt/ros/humble |
+| image_transport | **3.1.13** | ros-humble-image-transport |
+| livox_ros_driver2 | **1.2.6**, Git **13eb05e4e6dd7a765b934d0c5fd6236676a57b49** | https://github.com/Spaceia3000/livox_ros_driver2 (rama dev/mid360-integration) |
+| Livox-SDK2 | Bibliotecas SDK presentes en /usr/local/lib; **versión no identificada** | https://github.com/Livox-SDK/Livox-SDK2 |
+| vikit_common + vikit_ros | Los paquetes instalados indican 0.0.0, **no versión upstream válida**; fuente de referencia Git **0b5548d9adab58128f3a59a507e96a83acfa8fdf** | https://github.com/Rhymer-Lcy/rpg_vikit_ros2_fisheye |
+| FAST-LIVO2 | Rama Cohemos creada desde integration/v1-humble @ **8faf006** | Este repositorio |
 
-- 🔓 **2025-01-23**: Code released!  
-- 🎉 **2024-10-01**: Accepted by **T-RO '24**!  
-- 🚀 **2024-07-02**: Conditionally accepted.
+**Sobre Vikit:** las carpetas locales del workspace FAST no contienen su propia historia Git; el commit citado es del repositorio fuente disponible en la laptop, no una comprobación byte por byte de esas carpetas.
 
-### 📬 Contact
+**Sobre Livox-SDK2:** elegir la versión compatible con el driver siguiendo sus instrucciones oficiales y registrar después su commit. No se ha verificado el SHA de la instalación actual.
 
-For further inquiries or assistance, please contact [zhengcr@connect.hku.hk](mailto:zhengcr@connect.hku.hk).
+## Instalación en Ubuntu 22.04 x86_64
 
-## 1. Introduction
+Instalar ROS 2 Humble desde la guía oficial anterior; después:
 
-FAST-LIVO2 is an efficient and accurate LiDAR-inertial-visual fusion localization and mapping system, demonstrating significant potential for real-time 3D reconstruction and onboard robotic localization in severely degraded environments.
+~~~bash
+sudo apt update
+sudo apt install -y \
+  python3-colcon-common-extensions python3-rosdep \
+  libpcl-dev libopencv-dev libeigen3-dev libboost-all-dev libfmt-dev \
+  ros-humble-ament-cmake ros-humble-rosidl-default-generators \
+  ros-humble-rclcpp ros-humble-rclpy \
+  ros-humble-cv-bridge ros-humble-image-transport \
+  ros-humble-pcl-ros ros-humble-pcl-conversions \
+  ros-humble-tf2-ros ros-humble-visualization-msgs \
+  ros-humble-sophus ros-humble-rviz2
+~~~
 
-**Developer**: [Chunran Zheng 郑纯然](https://github.com/xuankuzcr)
+1. Instalar Livox-SDK2 desde https://github.com/Livox-SDK/Livox-SDK2.
+2. Instalar el fork de livox_ros_driver2 fijado a su commit:
 
-<div align="center">
-    <img src="pics/Framework.png" width = 100% >
-</div>
+~~~bash
+mkdir -p ~/Documents/sensors_ws/src
+cd ~/Documents/sensors_ws/src
+git clone https://github.com/Spaceia3000/livox_ros_driver2.git
+git -C livox_ros_driver2 checkout 13eb05e4e6dd7a765b934d0c5fd6236676a57b49
+~~~
 
-### 1.1 Related video
+Completar la compilación del driver **para ROS 2** según su README y generar ~/Documents/sensors_ws/install/setup.bash. El LiDAR debe publicar el tipo Livox CustomMsg.
 
-Our accompanying video is now available on [**Bilibili**](https://www.bilibili.com/video/BV1Ezxge7EEi) and [**YouTube**](https://youtu.be/6dF2DzgbtlY).
+3. Instalar las dos librerías Vikit desde esta fuente de referencia:
 
-### 1.2 Related paper
+~~~bash
+git clone https://github.com/Rhymer-Lcy/rpg_vikit_ros2_fisheye.git ~/Documents/rpg_vikit_ros2_fisheye
+git -C ~/Documents/rpg_vikit_ros2_fisheye checkout 0b5548d9adab58128f3a59a507e96a83acfa8fdf
+~~~
 
-[FAST-LIVO2: Fast, Direct LiDAR-Inertial-Visual Odometry](https://arxiv.org/pdf/2408.14035)  
+Colocar vikit_common y vikit_ros como paquetes hermanos de fast_livo dentro del **mismo workspace**. Esta versión de CMakeLists.txt enlaza las bibliotecas Vikit desde la carpeta install de ese workspace, por lo que no deben quedarse solo en una instalación externa arbitraria.
 
-[FAST-LIVO2 on Resource-Constrained Platforms](https://arxiv.org/pdf/2501.13876)  
+4. Clonar FAST-LIVO2 Cohemos:
 
-[FAST-LIVO: Fast and Tightly-coupled Sparse-Direct LiDAR-Inertial-Visual Odometry](https://arxiv.org/pdf/2203.00893)
+~~~bash
+mkdir -p ~/Documents/fast_livo2_baseline_ws/src
+cd ~/Documents/fast_livo2_baseline_ws/src
+git clone --single-branch --branch Cohemos \
+  https://github.com/Spaceia3000/FAST-LIVO2-ROS2-MID360-Fisheye.git
+~~~
 
-[FAST-Calib: LiDAR-Camera Extrinsic Calibration in One Second](https://www.arxiv.org/pdf/2507.17210)
+Con las dependencias instaladas y Vikit en ese mismo src:
 
-### 1.3 Our hard-synchronized equipment
+~~~bash
+source /opt/ros/humble/setup.bash
+source ~/Documents/sensors_ws/install/setup.bash
+cd ~/Documents/fast_livo2_baseline_ws
+colcon build --packages-select vikit_common vikit_ros --symlink-install
+source install/setup.bash
+colcon build --packages-select fast_livo --symlink-install
+source install/setup.bash
+~~~
 
-We open-source our handheld device, including CAD files, synchronization scheme, STM32 source code, wiring instructions, and sensor ROS driver. Access these resources at this repository: [**LIV_handhold**](https://github.com/xuankuzcr/LIV_handhold).
+**No necesitas GTSAM para FAST-LIVO2**; pertenece al backend Simple Loop Closure.
 
-### 1.4 Our associate dataset: FAST-LIVO2-Dataset
-Our associate dataset [**FAST-LIVO2-Dataset**](https://connecthkuhk-my.sharepoint.com/:f:/g/personal/zhengcr_connect_hku_hk/ErdFNQtjMxZOorYKDTtK4ugBkogXfq1OfDm90GECouuIQA?e=KngY9Z) used for evaluation is also available online.
+## Archivos que incluye esta rama
 
-### MARS-LVIG dataset
-[**MARS-LVIG dataset**](https://mars.hku.hk/dataset.html): A multi-sensor aerial robots SLAM dataset for LiDAR-visual-inertial-GNSS fusion.
+- src/, include/, msg/: código C++, estimación y mensajes ROS 2.
+- config/cohemo_lio.yaml: MID-360 + IMU, sin cámara.
+- config/cohemo_livo.yaml: MID-360 + IMU + Sony.
+- config/camera_sony_ev9520l.yaml: intrínsecos/distorsión registrados.
+- launch/mapping_ugv.launch.py: único launch para el robot.
+- rviz_cfg/mapping_ugv.rviz: visualizador opcional.
+- Log/: directorios de salida editables; ROOT_DIR se fija al compilar.
+- CMakeLists.txt, package.xml y LICENSE.
 
-### 1.5 Our LiDAR-camera calibration method
-The [**FAST-Calib**](https://github.com/hku-mars/FAST-Calib) toolkit is recommended. Its output extrinsic parameters can be directly filled into the YAML file.
+**No incluye un driver Sony:** debes proporcionar por separado un nodo de adquisición/capturadora que publique sensor_msgs/Image en /cam0/image_raw. La capturadora, el zoom y los timestamps hardware deben ser compatibles con la calibración.
 
-## 2. Prerequisited
+## Arranque con robot real
 
-### 2.1 Ubuntu and ROS
+Iniciar sensores y cámara primero. Configurar todos los nodos con el mismo dominio ROS y descubrimiento DDS compatible.
 
-Ubuntu 22.04.  [ROS Installation](http://wiki.ros.org/ROS/Installation).
+~~~bash
+source /opt/ros/humble/setup.bash
+source ~/Documents/sensors_ws/install/setup.bash
+source ~/Documents/fast_livo2_baseline_ws/install/setup.bash
 
-### 2.2 PCL && Eigen && OpenCV
+ros2 launch fast_livo mapping_ugv.launch.py \
+  mode:=cohemo_livo.yaml \
+  camera_params_file:=camera_sony_ev9520l.yaml \
+  use_sim_time:=false \
+  use_rviz:=false
+~~~
 
-PCL>=1.8, Follow [PCL Installation](https://pointclouds.org/). 
+Para solo LiDAR+IMU: mode:=cohemo_lio.yaml. El frontend proporciona /aft_mapped_to_init y /cloud_registered_metric con el mismo timestamp para el backend ExactTime; /cloud_registered aporta nube RGB local.
 
-Eigen>=3.3.4, Follow [Eigen Installation](https://eigen.tuxfamily.org/index.php?title=Main_Page).
+Para reproducir un rosbag, utilizar use_sim_time:=true y ros2 bag play --clock. ROS_LOCALHOST_ONLY=1 es apropiado solo si todos los nodos deben permanecer en un mismo equipo; **no usarlo en un UGV con sensores repartidos entre varias máquinas**.
 
-OpenCV>=4.2, Follow [Opencv Installation](http://opencv.org/).
+## Jetson AGX Orin y límites
 
-### 2.3 Sophus
+No copiar binarios x86_64 a ARM64. Verificar versión real de JetPack/L4T y compatibilidad con Ubuntu, ROS Humble, Livox-SDK2, SDK de cámara, Sophus y Vikit; recompilar para ARM64 y registrar versiones/SHAs. Este README describe las versiones de la laptop, **no un despliegue ya validado en Orin**.
 
-#### Binary installation
-```bash
-cd ~
-git clone https://github.com/strasdat/Sophus.git -b 1.22.10
-cd Sophus
-mkdir build && cd build && cmake ..
-make
-sudo make install
-```
-
-### 2.4 Vikit
-
-Vikit provides essential camera models, math utilities, and interpolation functions. As an ament package for ROS2, download its source into your colcon workspace's src folder. Additionally, I've added OpenCV fisheye distortion correction to the equidistant camera model in vikit_common.
-
-```bash
-# Different from the one used in fast-livo1
-cd ~
-git clone https://github.com/Rhymer-Lcy/rpg_vikit_ros2_fisheye.git
-mkdir -p ~/fast/src/
-cp -r ./rpg_vikit_ros2_fisheye/{vikit_common,vikit_ros} ~/fast_ws/src/
-```
-
-Thanks to the following repositories for the code reference:
-
-- [xuankuzcr/rpg_vikit](https://github.com/xuankuzcr/rpg_vikit)
-- [integralrobotics/rpg_vikit](https://github.com/integralrobotics/rpg_vikit)
-
-### 2.5 **livox_ros_driver2**
-
-Follow [livox_ros_driver2 Installation](https://github.com/Livox-SDK/livox_ros_driver2).
-
-```bash
-cd ~/fast_ws/src/
-git clone https://github.com/Livox-SDK/livox_ros_driver2.git ws_livox/src/livox_ros_driver2
-```
-
-why not use `livox_ros_driver`? Because it is not compatible with ROS2 directly. actually i am not think there s any difference between [livox ros driver](https://github.com/Livox-SDK/livox_ros_driver.git) and [livox ros driver2](https://github.com/Livox-SDK/livox_ros_driver2.git) 's `CustomMsg`, the latter 's ros2 version is sufficient.
-
-## 3. Build
-
-Clone the repository and colcon build:
-
-```
-git clone https://github.com/Rhymer-Lcy/FAST-LIVO2-ROS2-MID360-Fisheye.git
-cd livox_ros_driver2
-./build.sh humble
-source ~/fast_ws/install/setup.bash
-```
-
-## 4. Run our examples
-
-Download FAST-LIVO2-Dataset from [Global-LVBA](https://github.com/xuankuzcr/Global-LVBA) Section IV.
-
-### convert rosbag
-
-convert ROS1 rosbag to ROS2 rosbag
-```bash
-pip install rosbags
-rosbags-convert --src Retail_Street.bag --dst Retail_Street
-```
-- [gitlab rosbags](https://gitlab.com/ternaris/rosbags)
-- [pypi rosbags](https://pypi.org/project/rosbags/)
-
-### change the msg type on rosbag
-
-Such as dataset `Retail_Street.db3`, because we use `livox_ros2_driver2`'s `CustomMsg`, we need to change the msg type in the rosbag file. 
-1. use `rosbags-convert` to convert rosbag from ROS1 to ROS2.
-2. change the msg type of msg type in **metadata.yaml** as follows:
-
-**metadata.yaml**
-```diff
-rosbag2_bagfile_information:
-  compression_format: ''
-  compression_mode: ''
-  custom_data: {}
-  duration:
-    nanoseconds: 135470252209
-  files:
-  - duration:
-      nanoseconds: 135470252209
-    message_count: 30157
-    path: Retail_Street.db3
-    ..............
-    topic_metadata:
-      name: /livox/lidar
-      offered_qos_profiles: ''
-      serialization_format: cdr
--     type: livox_ros_driver/msg/CustomMsg
-+     type: livox_ros_driver2/msg/CustomMsg
-      type_description_hash: RIHS01_94041b4794f52c1d81def2989107fc898a62dacb7a39d5dbe80d4b55e538bf6d
-    ...............
-.....
-```
-
-### Run the demo
-
-Do not forget to `source` your ROS2 workspace before running the following command.
-
-```bash
-ros2 launch fast_livo mapping_aviz.launch.py use_rviz:=True use_sim_time:=True
-ros2 bag play -p Retail_Street  # Use space bar to play/pause
-```
-
-```bash
-ros2 launch fast_livo mapping_aviz_metacamedu.launch.py use_rviz:=True use_sim_time:=True  # Configuration for MID360-Fisheye dataset
-ros2 bag play -p $BAG_PATH  # Use space bar to play/pause (self-collected MID360-Fisheye dataset)
-```
-
-## 5. License
-
-The source code of this package is released under the [**GPLv2**](http://www.gnu.org/licenses/) license. For commercial use, please contact me at <zhengcr@connect.hku.hk> and Prof. Fu Zhang at <fuzhang@hku.hk> to discuss an alternative license.
+FAST-LIVO2 LIVO todavía puede quedar esperando ante huecos de imágenes Sony. El fallback LIO continuo no está certificado. Las calibraciones son específicas del montaje; no se acredita navegación segura ni F3. Pruebas y evidencia histórica están en integration/v1-humble.
