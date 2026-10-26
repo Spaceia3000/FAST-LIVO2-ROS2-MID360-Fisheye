@@ -177,8 +177,8 @@ ament_target_dependencies(laser_mapping ${dependencies})
 # linking libraries or executables to public dependencies
 target_link_libraries(laser_mapping 
     "${cpp_typesupport_target}"
-    ${CMAKE_SOURCE_DIR}/../../install/vikit_common/lib/libvikit_common.so 
-    ${CMAKE_SOURCE_DIR}/../../install/vikit_ros/lib/libvikit_ros.so
+    vikit_common::vikit_common
+    vikit_ros::vikit_ros
     ${COMMON_DEPENDENCIES}
 )
 target_link_libraries(vio ${COMMON_DEPENDENCIES})
