@@ -71,3 +71,12 @@ TEST(VisualMapGrowth, RejectsNonFiniteAndOverflowCoordinates)
   EXPECT_FALSE(visual_map_growth::voxelCoordinate(
       -std::numeric_limits<double>::max()).has_value());
 }
+
+
+TEST(VisualMapGrowth, RejectsNonFiniteInAllVoxelAxes)
+{
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_FALSE(visual_map_growth::voxelBucket(nan, 0.0, 0.0).has_value());
+  EXPECT_FALSE(visual_map_growth::voxelBucket(0.0, nan, 0.0).has_value());
+  EXPECT_FALSE(visual_map_growth::voxelBucket(0.0, 0.0, nan).has_value());
+}

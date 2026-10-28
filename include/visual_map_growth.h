@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <optional>
 
@@ -15,10 +16,21 @@ constexpr double kVoxelSize = 0.5;
 
 using VoxelBucket = std::array<std::int64_t, 3>;
 
+// ARM Release enables -ffast-math: std::isfinite can be optimized to true.
+// Inspect the IEEE-754 exponent without floating-point classification assumptions.
+inline bool isFiniteFloatBits(const float value) noexcept
+{
+  static_assert(sizeof(float) == sizeof(std::uint32_t), "32-bit float required");
+  static_assert(std::numeric_limits<float>::is_iec559, "IEEE-754 float required");
+  std::uint32_t bits = 0U;
+  std::memcpy(&bits, &value, sizeof(bits));
+  return (bits & 0x7f800000U) != 0x7f800000U;
+}
+
 inline std::optional<std::int64_t> voxelCoordinate(double coordinate)
 {
   float location = static_cast<float>(coordinate / kVoxelSize);
-  if (!std::isfinite(location)) return std::nullopt;
+  if (!isFiniteFloatBits(location)) return std::nullopt;
   if (location < 0.0F) location -= 1.0F;
 
   constexpr long double kInt64Lower =
