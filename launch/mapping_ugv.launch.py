@@ -196,10 +196,18 @@ def launch_setup(context):
         # Explicit rviz_config always wins; empty means automatic selection.
         requested_rviz = arg("rviz_config").strip()
         mode_stem = Path(paths[0]).stem
-        if mode_stem.endswith("_lio"):
-            rviz_name = "cohemo_lio.rviz"
-        elif mode_stem.endswith("_livo"):
-            rviz_name = "cohemo_livo.rviz"
+        if mode_stem.startswith("ugv_"):
+            if mode_stem.endswith("_lio"):
+                rviz_name = "ugv_lio.rviz"
+            elif mode_stem.endswith("_livo"):
+                rviz_name = "ugv_livo.rviz"
+            else:
+                rviz_name = "mapping_ugv.rviz"
+        elif mode_stem.startswith("cohemo_"):
+            if mode_stem.endswith("_lio"):
+                rviz_name = "cohemo_lio.rviz"
+            else:
+                rviz_name = "cohemo_livo.rviz"
         else:
             rviz_name = "mapping_ugv.rviz"
         rviz = Path(requested_rviz) if requested_rviz else Path(share) / "rviz_cfg" / rviz_name
