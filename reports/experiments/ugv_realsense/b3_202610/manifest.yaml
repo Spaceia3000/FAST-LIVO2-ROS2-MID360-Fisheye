@@ -1,0 +1,29 @@
+experiment: ugv_realsense_b3_202610
+platform: UGV_LSI
+camera: RealSense D435i
+lidar: Livox MID-360
+imu: Livox MID-360
+historical_frontend_commit: 52db4d422e00a0e1588bed86d91ac4361b21aca9
+source_frontend_commit: 6c26bc413676278dfcd6c1272daf5047596267e5
+historical_generator_commit: c40cf24f870b2a4a8396924af7f2740382d5b00e
+status: candidate_pending_UGV_validation
+baseline_yaml: config/ugv_livo.yaml
+candidate_yaml: config/ugv_realsense_livo.yaml
+calibration_yaml: config/camera_realsense.yaml
+differences_from_baseline:
+  preprocess.filter_size_surf: 0.15
+  runtime.image_admission_hz: 7.5
+  diagnostics.ingest.enabled: true
+retained:
+  runtime.ingest_spin_budget_ms: 5
+  runtime.livo_camera_wait_sensor_s: 0.30
+  vio.max_visual_points_per_voxel: 64
+  imu.imu_en: true
+  common.img_en: 1
+calibration_unchanged: true
+baseline_sha256: 806460edfe6fbf62e4545280b25c6857e3dd97c34b7844ab12b05bc97de91579
+candidate_sha256: 7fa080a6590e7166ed4518a533147ecb098260516b77702a58c6a2f126c24f64
+camera_sha256: 115e780779aec2ed46fbe423ff10801b7a9033a97577fb41cee1da1cb4976794
+notes: >
+  B3 was historically promising but NOT validated for sustained one-hour moving UGV.
+  Historic B3 data and final live acceptance are independent of this YAML reconstruction.

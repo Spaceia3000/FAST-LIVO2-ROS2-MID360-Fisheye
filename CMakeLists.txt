@@ -106,6 +106,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_livo_camera_fallback test/test_livo_camera_fallback.cpp)
   target_include_directories(test_livo_camera_fallback PRIVATE include)
+  ament_add_gtest(test_visual_map_growth test/test_visual_map_growth.cpp)
+  target_include_directories(test_visual_map_growth PRIVATE include)
 endif()
 
 
