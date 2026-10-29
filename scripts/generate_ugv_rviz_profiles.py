@@ -53,8 +53,40 @@ def edit_display(text: str, name: str, **changes: object) -> str:
     return "".join(lines)
 
 
+
+
+def extract_loop_closure_group() -> str:
+    """Retain the SLC group from the pinned UGV template as literal RViz YAML."""
+    source = (REPO / "scripts" / "rviz_templates" / "ugv_livo.rviz").read_text()
+    marker = "    - Class: rviz_common/Group\n      Displays:\n"
+    start = source.index(marker)
+    end = source.index("    - Class: rviz_common/Group\n", start + len(marker))
+    group = source[start:end]
+    if group.count("      Name: GLOBAL - Simple Loop Closure (GTSAM)\n") != 1:
+        raise ValueError("Invalid pinned SLC group")
+    return group
+
+
+def generate_dense_original_with_closure(is_livo: bool) -> str:
+    """Verbatim upstream FAST-LIVO2 RViz plus exactly one SLC display group."""
+    source = (REPO / "scripts" / "rviz_templates" / "fast_livo2_upstream.rviz").read_text()
+    marker = "    - Class: rviz_common/Group\n      Displays:\n"
+    if source.count(marker) != 2:
+        # The original contains exactly two groups: mapping and Odometry.
+        raise ValueError("Unexpected upstream RViz structure")
+    group = extract_loop_closure_group()
+    group = edit_display(group, "Mapa global RGB corregido (GTSAM)", Enabled=is_livo)
+    group = edit_display(group, "Mapa global XYZI PGO (opcional)", Enabled=not is_livo)
+    # Insert before the original mapping group, retaining EVERY original byte
+    # (including 10000s surround, activated displays, colors and window settings).
+    return source.replace(marker, group + marker, 1)
+
 def generate(stem: str, template: str, livo: bool, profile: str) -> str:
-    dense = profile == "dense"
+    if profile == "dense":
+        return generate_dense_original_with_closure(livo)
+    if profile != "light":
+        raise ValueError(f"Unsupported RViz profile: {profile}")
+    dense = False
     doc = (REPO / "scripts" / "rviz_templates" / template).read_text()
     doc = edit_display(
         doc, "UGV metric cloud", Enabled=True,
@@ -81,9 +113,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true",
                         help="Check output matches generated variants; do not write.")
+    parser.add_argument("--refresh-dense", action="store_true",
+                        help="Explicitly replace only the three tracked dense profiles.")
     args = parser.parse_args()
+    if args.check and args.refresh_dense:
+        parser.error("--check and --refresh-dense are exclusive")
     for stem, template, livo in SOURCES:
         for profile in PROFILES:
+            if args.refresh_dense and profile != "dense":
+                continue
             target = REPO / "rviz_cfg" / f"{stem}_{profile}.rviz"
             desired = generate(stem, template, livo, profile)
             if args.check:
@@ -91,8 +129,10 @@ def main() -> None:
                     raise SystemExit(f"FAIL: {target} differs from generated profile")
                 print(f"PASS {target.name}")
             else:
-                if target.exists() and target.read_text() != desired:
+                if target.exists() and target.read_text() != desired and not args.refresh_dense:
                     raise SystemExit(f"Refusing to overwrite edited RViz: {target}")
+                if args.refresh_dense and not target.is_file():
+                    raise SystemExit(f"Refusing to create missing dense target: {target}")
                 target.write_text(desired)
                 print(f"CREATED {target.name}")
 
