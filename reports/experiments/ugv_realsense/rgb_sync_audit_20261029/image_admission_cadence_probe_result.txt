@@ -1,0 +1,2 @@
+camera_input_hz=30 target_hz=7.500 eight_second_frames=240 accepted=54 too_soon=186 actual_hz=6.750
+camera_input_hz=30 target_hz=10.000 eight_second_frames=240 accepted=64 too_soon=176 actual_hz=8.000
