@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Generate reversible UGV light/dense RViz variants from pinned original profiles.
+"""Generate reversible UGV light/dense RViz variants from versioned templates.
 
+Pinned templates are independent of operator-edited RViz files.
 No sensor or SLAM parameters are changed. --check verifies byte-for-byte output.
 """
 from __future__ import annotations
@@ -54,7 +55,7 @@ def edit_display(text: str, name: str, **changes: object) -> str:
 
 def generate(stem: str, template: str, livo: bool, profile: str) -> str:
     dense = profile == "dense"
-    doc = (REPO / "rviz_cfg" / template).read_text()
+    doc = (REPO / "scripts" / "rviz_templates" / template).read_text()
     doc = edit_display(
         doc, "UGV metric cloud", Enabled=True,
         **{"Decay Time": 3 if dense else 0,
