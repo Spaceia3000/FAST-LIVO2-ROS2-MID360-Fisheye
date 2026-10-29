@@ -173,6 +173,21 @@ def parse_bool(value):
     return value.lower() == "true"
 
 
+def select_rviz_filename(mode_stem, profile):
+    """Select opt-in UGV visualization density without affecting SLAM parameters."""
+    if profile not in {"light", "dense"}:
+        raise RuntimeError(f"Invalid rviz_profile {profile!r}; use light or dense")
+
+    # Profiles follow the exact installed sensor YAML name (minus .yaml).
+    if mode_stem in {"ugv_lio", "ugv_livo", "ugv_realsense_livo"}:
+        return f"{mode_stem}_{profile}.rviz"
+    if mode_stem.startswith("ugv_"):
+        return "mapping_ugv.rviz"  # Keep LO and other UGV profiles unchanged.
+    if mode_stem.startswith("cohemo_"):
+        return "cohemo_lio.rviz" if mode_stem.endswith("_lio") else "cohemo_livo.rviz"
+    return "mapping_ugv.rviz"
+
+
 def launch_setup(context):
     def arg(name):
         return LaunchConfiguration(name).perform(context)
@@ -196,20 +211,7 @@ def launch_setup(context):
         # Explicit rviz_config always wins; empty means automatic selection.
         requested_rviz = arg("rviz_config").strip()
         mode_stem = Path(paths[0]).stem
-        if mode_stem.startswith("ugv_"):
-            if mode_stem.endswith("_lio"):
-                rviz_name = "ugv_lio.rviz"
-            elif mode_stem.endswith("_livo"):
-                rviz_name = "ugv_livo.rviz"
-            else:
-                rviz_name = "mapping_ugv.rviz"
-        elif mode_stem.startswith("cohemo_"):
-            if mode_stem.endswith("_lio"):
-                rviz_name = "cohemo_lio.rviz"
-            else:
-                rviz_name = "cohemo_livo.rviz"
-        else:
-            rviz_name = "mapping_ugv.rviz"
+        rviz_name = select_rviz_filename(mode_stem, arg("rviz_profile"))
         rviz = Path(requested_rviz) if requested_rviz else Path(share) / "rviz_cfg" / rviz_name
         if not rviz.is_file():
             raise RuntimeError(f"RViz configuration missing: {rviz}")
@@ -225,7 +227,8 @@ def generate_launch_description():
         "mode": "ugv_livo.yaml", "camera_params_file": "camera_realsense.yaml",
         "input_mode": "raw", "image_topic": "", "use_sim_time": "false",
         "use_rviz": "true",
-        "rviz_config": "",  # Empty: select cohemo_lio.rviz or cohemo_livo.rviz by mode.
+        "rviz_profile": "light",  # UGV profiles: light (default) or dense (RViz only).
+        "rviz_config": "",  # Optional explicit RViz path overrides automatic selection.
     }
     return LaunchDescription([
         *[DeclareLaunchArgument(name, default_value=value) for name, value in defaults.items()],

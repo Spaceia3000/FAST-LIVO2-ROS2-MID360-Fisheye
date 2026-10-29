@@ -37,8 +37,9 @@ def test_calibration_profile_and_platform_are_unchanged():
 
 def test_rviz_is_platform_specific_and_no_historical_rgb_accumulation():
     launch=(REPO/"launch/mapping_ugv.launch.py").read_text()
-    assert 'rviz_name = "ugv_livo.rviz"' in launch
-    assert 'rviz_name = "ugv_lio.rviz"' in launch
+    assert '"rviz_profile": "light"' in launch
+    assert 'select_rviz_filename(mode_stem, arg("rviz_profile"))' in launch
+    assert 'rviz = Path(requested_rviz) if requested_rviz else' in launch
     for name in ["ugv_livo.rviz","ugv_lio.rviz"]:
         content=(REPO/"rviz_cfg"/name).read_text()
         assert "Name: Legacy accumulated diagnostic" in content
