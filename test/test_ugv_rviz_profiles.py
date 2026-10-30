@@ -94,6 +94,19 @@ def test_dense_preserves_complete_unmodified_upstream_original(stem):
     assert current["Enabled"] is True
     assert current["Decay Time"] == 0
     assert current["Topic"]["Value"] == "/cloud_registered"
+    original_path = named_display(original, None, "Path")
+    assert original_path["Alpha"] == 0
+    vendor_path_in_dense = named_display(dense, None, "Path")
+    assert vendor_path_in_dense == original_path
+    cyan = named_display(dense, "GLOBAL - Simple Loop Closure (GTSAM)",
+                         "Trayectoria FAST-LIVO2 (cian)")
+    assert cyan["Topic"]["Value"] == "/path"
+    assert cyan["Alpha"] == 1
+    assert cyan["Color"] == original_path["Color"]
+    assert cyan["Enabled"] is True
+    # The clone must differ from the upstream display only in name and visibility.
+    assert {k: v for k, v in cyan.items() if k not in {"Alpha", "Name"}} == (
+        {k: v for k, v in original_path.items() if k not in {"Alpha", "Name"}})
     # Beyond YAML semantic parity, verify that inserting the one SLC group is
     # the exact only textual change to the vendor's original RViz file.
     generator = load_module("ugv_rviz_generator_pinned", GENERATOR)
@@ -102,6 +115,7 @@ def test_dense_preserves_complete_unmodified_upstream_original(stem):
         group, "Mapa global RGB corregido (GTSAM)", Enabled=stem != "ugv_lio")
     group = generator.edit_display(
         group, "Mapa global XYZI PGO (opcional)", Enabled=stem == "ugv_lio")
+    group = generator.add_visible_original_path_to_group(group)
     assert document.replace(group, "", 1) == source
 
 
