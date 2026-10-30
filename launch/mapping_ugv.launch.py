@@ -144,7 +144,9 @@ def resolve_contract(share, mode="cohemo_livo.yaml", camera_params_file="",
 
     def camera_path(name):
         if not name:
-            name = "camera_sony_ev9520l.yaml"
+            # Safety: never silently substitute Sony optics for RealSense UGV.
+            # The explicit launch default also selects camera_realsense.yaml.
+            name = "camera_realsense.yaml"
         path = Path(name)
         if path.is_absolute():
             return str(path.resolve())
