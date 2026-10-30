@@ -221,6 +221,34 @@ Visualization Manager:
             Reliability Policy: Reliable
             Value: /simple_loop_closure/original_keyframes
           Value: false
+        - Alpha: 1
+          Buffer Length: 2
+          Class: rviz_default_plugins/Path
+          Color: 25; 255; 255
+          Enabled: true
+          Head Diameter: 0
+          Head Length: 0
+          Length: 0.30000001192092896
+          Line Style: Billboards
+          Line Width: 0.03999999910593033
+          Name: Trayectoria FAST-LIVO2 (cian)
+          Offset:
+            X: 0
+            Y: 0
+            Z: 0
+          Pose Color: 25; 255; 255
+          Pose Style: None
+          Radius: 0.029999999329447746
+          Shaft Diameter: 0.4000000059604645
+          Shaft Length: 0.4000000059604645
+          Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            Filter size: 10
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /path
+          Value: true
       Enabled: true
       Name: GLOBAL - Simple Loop Closure (GTSAM)
     - Class: rviz_common/Group

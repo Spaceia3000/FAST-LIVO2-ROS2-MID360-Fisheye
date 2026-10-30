@@ -67,8 +67,34 @@ def extract_loop_closure_group() -> str:
     return group
 
 
+def add_visible_original_path_to_group(group: str) -> str:
+    """Expose FAST-LIVO2 /path in cyan inside SLC while preserving upstream Path.
+
+    Vendor RViz sets the original Path display Alpha=0 (fully transparent).
+    Clone that display into the added SLC group with only Name and Alpha changed.
+    """
+    upstream = (REPO / "scripts" / "rviz_templates" / "fast_livo2_upstream.rviz").read_text()
+    matches = list(re.finditer(
+        r"(?ms)^    - Alpha: 0\n      Buffer Length: 2\n"
+        r"      Class: rviz_default_plugins/Path\n.*?(?=^    - |\Z)", upstream))
+    if len(matches) != 1:
+        raise ValueError(f"Cannot identify unique original FAST-LIVO2 Path: {len(matches)}")
+    path = matches[0].group(0)
+    if path.count("      Name: Path\n") != 1 or path.count("        Value: /path\n") != 1:
+        raise ValueError("Upstream /path display changed")
+    path = path.replace("    - Alpha: 0\n", "    - Alpha: 1\n", 1)
+    path = path.replace("      Name: Path\n", "      Name: Trayectoria FAST-LIVO2 (cian)\n", 1)
+    # SLC Displays are nested one level below the original root displays.
+    path = "".join("    " + line if line.strip() else line
+                   for line in path.splitlines(keepends=True))
+    marker = "      Enabled: true\n      Name: GLOBAL - Simple Loop Closure (GTSAM)\n"
+    if group.count(marker) != 1:
+        raise ValueError("Cannot place visible path inside SLC group")
+    return group.replace(marker, path + marker, 1)
+
+
 def generate_dense_original_with_closure(is_livo: bool) -> str:
-    """Verbatim upstream FAST-LIVO2 RViz plus exactly one SLC display group."""
+    """Verbatim upstream FAST-LIVO2 RViz plus one SLC group, with visible cyan path."""
     source = (REPO / "scripts" / "rviz_templates" / "fast_livo2_upstream.rviz").read_text()
     marker = "    - Class: rviz_common/Group\n      Displays:\n"
     if source.count(marker) != 2:
@@ -77,6 +103,7 @@ def generate_dense_original_with_closure(is_livo: bool) -> str:
     group = extract_loop_closure_group()
     group = edit_display(group, "Mapa global RGB corregido (GTSAM)", Enabled=is_livo)
     group = edit_display(group, "Mapa global XYZI PGO (opcional)", Enabled=not is_livo)
+    group = add_visible_original_path_to_group(group)
     # Insert before the original mapping group, retaining EVERY original byte
     # (including 10000s surround, activated displays, colors and window settings).
     return source.replace(marker, group + marker, 1)
