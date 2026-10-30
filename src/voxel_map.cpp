@@ -886,15 +886,13 @@ void VoxelMapManager::BuildResidualListOMP(std::vector<pointWithVar> &pv_list, s
   int max_layer = config_setting_.max_layer_;
   double voxel_size = config_setting_.max_voxel_size_;
   double sigma_num = config_setting_.sigma_num_;
-  std::mutex mylock;
   ptpl_list.clear();
   std::vector<PointToPlane> all_ptpl_list(pv_list.size());
-  std::vector<bool> useful_ptpl(pv_list.size());
+  std::vector<std::uint8_t> useful_ptpl(pv_list.size(), 0);
   std::vector<size_t> index(pv_list.size());
   for (size_t i = 0; i < index.size(); ++i)
   {
     index[i] = i;
-    useful_ptpl[i] = false;
   }
   #ifdef MP_EN
     omp_set_num_threads(MP_PROC_NUM);
@@ -932,16 +930,12 @@ void VoxelMapManager::BuildResidualListOMP(std::vector<pointWithVar> &pv_list, s
       }
       if (is_sucess)
       {
-        mylock.lock();
-        useful_ptpl[i] = true;
+        useful_ptpl[i] = 1;
         all_ptpl_list[i] = single_ptpl;
-        mylock.unlock();
       }
       else
       {
-        mylock.lock();
-        useful_ptpl[i] = false;
-        mylock.unlock();
+        useful_ptpl[i] = 0;
       }
     }
   }

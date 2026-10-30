@@ -19,9 +19,9 @@ which is included as part of this source code package.
 #include "lidar_localizability_calibration_summary.h"
 #include "lidar_geometry_evidence_runtime_policy.h"
 #include <Eigen/Dense>
+#include <cstdint>
 #include <fstream>
 #include <math.h>
-#include <mutex>
 #include <omp.h>
 #include <pcl/common/io.h>
 #include <rclcpp/rclcpp.hpp>
