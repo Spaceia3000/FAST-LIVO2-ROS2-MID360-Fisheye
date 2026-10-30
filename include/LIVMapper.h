@@ -20,6 +20,7 @@ which is included as part of this source code package.
 #include "lidar_localizability_calibration_transport.h"
 #include "image_admission.h"
 #include "livo_camera_fallback.h"
+#include "fixed_interval_stats.h"
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.hpp>
 #include <tf2_ros/transform_broadcaster.h>
@@ -46,6 +47,7 @@ public:
   void savePCD();
   void processImu();
   void logIngestDiagnostics();
+  void logPerformanceDiagnostics();
   
   bool sync_packages(LidarMeasureGroup &meas);
   bool prepareLivoLioCut(
@@ -223,6 +225,12 @@ public:
   double livo_camera_wait_sensor_s = 0.0;
   double livo_last_sensor_cut_time = -1.0;
   bool ingest_diagnostics_enabled = false;
+  bool performance_diagnostics_enabled = false;
+  enum PerfStage { CALLBACK_DRAIN, SYNC_TRUE, SYNC_FALSE, IMU, LIO_STAGE, VIO_STAGE,
+                   METRIC_PUBLISH, RGB_PUBLISH, PATH_PUBLISH, PERF_STAGE_COUNT };
+  std::array<FixedIntervalStats<128>, PERF_STAGE_COUNT> performance_stats;
+  std::chrono::steady_clock::time_point last_performance_log_time;
+  std::size_t performance_path_pose_count = 0;
   std::uint64_t camera_accepted_count = 0;
   std::uint64_t camera_skipped_count = 0;
   std::uint64_t last_logged_camera_accepted_count = 0;

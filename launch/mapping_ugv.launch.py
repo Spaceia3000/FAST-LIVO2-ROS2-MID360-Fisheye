@@ -196,11 +196,13 @@ def launch_setup(context):
     share = get_package_share_directory("fast_livo")
     sim_time = parse_bool(arg("use_sim_time"))
     use_rviz = parse_bool(arg("use_rviz"))
+    g1_performance = parse_bool(arg("g1_performance"))
     paths, overrides, topic = resolve_contract(
         share, arg("mode"), arg("camera_params_file"),
         arg("input_mode"), arg("image_topic"), sim_time,
     )
     livox = validate_livox_runtime()
+    overrides["diagnostics.performance.enabled"] = g1_performance
     actions = [LogInfo(msg=(
         f"UGV FAST: profiles={paths}, mode={arg('mode')}, input_mode={arg('input_mode')}, "
         f"image_topic={topic}, use_sim_time={sim_time} (launch argument; "
@@ -228,7 +230,7 @@ def generate_launch_description():
     defaults = {
         "mode": "ugv_livo.yaml", "camera_params_file": "camera_realsense.yaml",
         "input_mode": "raw", "image_topic": "", "use_sim_time": "false",
-        "use_rviz": "true",
+        "use_rviz": "true", "g1_performance": "false",
         "rviz_profile": "light",  # UGV profiles: light (default) or dense (RViz only).
         "rviz_config": "",  # Optional explicit RViz path overrides automatic selection.
     }

@@ -144,6 +144,7 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
   try_declare.template operator()<double>("runtime.image_admission_hz", 50.0);
   try_declare.template operator()<double>("runtime.livo_camera_wait_sensor_s", 0.0);
   try_declare.template operator()<bool>("diagnostics.ingest.enabled", false);
+  try_declare.template operator()<bool>("diagnostics.performance.enabled", false);
 
   try_declare.template operator()<double>("publish.blind_rgb_points", 0.01);
   try_declare.template operator()<int>("publish.pub_scan_num", 1);
@@ -242,6 +243,7 @@ void LIVMapper::readParameters(rclcpp::Node::SharedPtr &node)
     throw std::invalid_argument("runtime.livo_camera_wait_sensor_s must be finite and nonnegative");
   }
   this->node->get_parameter("diagnostics.ingest.enabled", ingest_diagnostics_enabled);
+  this->node->get_parameter("diagnostics.performance.enabled", performance_diagnostics_enabled);
 
   this->node->get_parameter("publish.blind_rgb_points", blind_rgb_points);
   this->node->get_parameter("publish.pub_scan_num", pub_scan_num);
@@ -598,7 +600,10 @@ void LIVMapper::handleVIO()
   //   visual_sub_map->push_back(temp_map);
   // }
 
+  const auto rgb_start = performance_diagnostics_enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   publish_frame_world(pubLaserCloudFullRes, vio_manager);
+  if (performance_diagnostics_enabled) performance_stats[RGB_PUBLISH].add(
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - rgb_start).count());
   publish_img_rgb(pubImage, vio_manager);
 
   euler_cur = RotMtoEuler(_state.rot_end);
@@ -734,17 +739,27 @@ void LIVMapper::handleLIO()
 
   if (metric_cloud_en && pubLaserCloudMetric && !laserCloudWorld->empty())
   {
+    const auto perf_start = performance_diagnostics_enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     sensor_msgs::msg::PointCloud2 metric_cloud_msg;
     pcl::toROSMsg(*laserCloudWorld, metric_cloud_msg);
     metric_cloud_msg.header.stamp = sec2Stamp(LidarMeasures.last_lio_update_time);
     metric_cloud_msg.header.frame_id = "camera_init";
     pubLaserCloudMetric->publish(metric_cloud_msg);
+    if (performance_diagnostics_enabled) performance_stats[METRIC_PUBLISH].add(
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - perf_start).count());
   }
 
   publish_frame_world(pubLaserCloudFullRes, vio_manager);
   if (pub_effect_point_en) publish_effect_world(pubLaserCloudEffect, voxelmap_manager->ptpl_list_);
   if (voxelmap_manager->config_setting_.is_pub_plane_map_) voxelmap_manager->pubVoxelMap();
+  const auto path_start = performance_diagnostics_enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   publish_path(pubPath);
+  if (performance_diagnostics_enabled)
+  {
+    performance_stats[PATH_PUBLISH].add(
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - path_start).count());
+    performance_path_pose_count = path.poses.size();
+  }
   publish_mavros(mavros_pose_publisher);
 
   frame_num++;
@@ -847,25 +862,46 @@ void LIVMapper::run()
     {
       if (ingest_executor)
       {
+        const auto perf_start = performance_diagnostics_enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
         ingest_executor->spin_all(std::chrono::milliseconds(ingest_spin_budget_ms));
+        if (performance_diagnostics_enabled) performance_stats[CALLBACK_DRAIN].add(
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - perf_start).count());
       }
       else
       {
+        const auto perf_start = performance_diagnostics_enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
         rclcpp::spin_some(this->node);
+        if (performance_diagnostics_enabled) performance_stats[CALLBACK_DRAIN].add(
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - perf_start).count());
       }
       logIngestDiagnostics();
-      if (!sync_packages(LidarMeasures))
+      logPerformanceDiagnostics();
+      const auto sync_start = performance_diagnostics_enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+      const bool sync_ready = sync_packages(LidarMeasures);
+      if (performance_diagnostics_enabled)
+      {
+        performance_stats[sync_ready ? SYNC_TRUE : SYNC_FALSE].add(
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - sync_start).count());
+      }
+      if (!sync_ready)
       {
         rate.sleep();
         continue;
       }
       handleFirstFrame();
 
+      const auto imu_start = performance_diagnostics_enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
       processImu();
+      if (performance_diagnostics_enabled) performance_stats[IMU].add(
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - imu_start).count());
 
       // if (!p_imu->imu_time_init) continue;
 
+      const auto mapping_start = performance_diagnostics_enabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+      const auto stage = LidarMeasures.lio_vio_flg == VIO ? VIO_STAGE : LIO_STAGE;
       stateEstimationAndMapping();
+      if (performance_diagnostics_enabled) performance_stats[stage].add(
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - mapping_start).count());
     }
   }
   catch (...)
@@ -881,6 +917,54 @@ void LIVMapper::run()
     ingest_executor->remove_node(this->node);
   }
   savePCD();
+}
+
+void LIVMapper::logPerformanceDiagnostics()
+{
+  if (!performance_diagnostics_enabled) return;
+  const auto now = std::chrono::steady_clock::now();
+  if (last_performance_log_time.time_since_epoch().count() == 0)
+  {
+    last_performance_log_time = now;
+    return;
+  }
+  if (now - last_performance_log_time < std::chrono::seconds(1)) return;
+  last_performance_log_time = now;
+  std::array<FixedIntervalStats<128>::Summary, PERF_STAGE_COUNT> s;
+  for (std::size_t i = 0; i < PERF_STAGE_COUNT; ++i)
+  {
+    s[i] = performance_stats[i].summary();
+    performance_stats[i].reset();
+  }
+  RCLCPP_INFO(node->get_logger(),
+      "[perf_g1] callback_drain sample_count=%llu recent_count=%zu p50_recent128=%.3f p95_recent128=%.3f max_all=%.3f; "
+      "sync_true sample_count=%llu recent_count=%zu p50_recent128=%.3f p95_recent128=%.3f max_all=%.3f; "
+      "sync_false sample_count=%llu recent_count=%zu p50_recent128=%.3f p95_recent128=%.3f max_all=%.3f; "
+      "imu sample_count=%llu recent_count=%zu p50_recent128=%.3f p95_recent128=%.3f max_all=%.3f; "
+      "lio sample_count=%llu recent_count=%zu p50_recent128=%.3f p95_recent128=%.3f max_all=%.3f; "
+      "vio sample_count=%llu recent_count=%zu p50_recent128=%.3f p95_recent128=%.3f max_all=%.3f; "
+      "metric_publish sample_count=%llu recent_count=%zu p50_recent128=%.3f p95_recent128=%.3f max_all=%.3f; "
+      "rgb_publish sample_count=%llu recent_count=%zu p50_recent128=%.3f p95_recent128=%.3f max_all=%.3f; "
+      "path_publish sample_count=%llu recent_count=%zu p50_recent128=%.3f p95_recent128=%.3f max_all=%.3f path_poses=%zu (ms)",
+      (unsigned long long)s[CALLBACK_DRAIN].sample_count, s[CALLBACK_DRAIN].recent_sample_count,
+      s[CALLBACK_DRAIN].p50_recent, s[CALLBACK_DRAIN].p95_recent, s[CALLBACK_DRAIN].max_all,
+      (unsigned long long)s[SYNC_TRUE].sample_count, s[SYNC_TRUE].recent_sample_count,
+      s[SYNC_TRUE].p50_recent, s[SYNC_TRUE].p95_recent, s[SYNC_TRUE].max_all,
+      (unsigned long long)s[SYNC_FALSE].sample_count, s[SYNC_FALSE].recent_sample_count,
+      s[SYNC_FALSE].p50_recent, s[SYNC_FALSE].p95_recent, s[SYNC_FALSE].max_all,
+      (unsigned long long)s[IMU].sample_count, s[IMU].recent_sample_count,
+      s[IMU].p50_recent, s[IMU].p95_recent, s[IMU].max_all,
+      (unsigned long long)s[LIO_STAGE].sample_count, s[LIO_STAGE].recent_sample_count,
+      s[LIO_STAGE].p50_recent, s[LIO_STAGE].p95_recent, s[LIO_STAGE].max_all,
+      (unsigned long long)s[VIO_STAGE].sample_count, s[VIO_STAGE].recent_sample_count,
+      s[VIO_STAGE].p50_recent, s[VIO_STAGE].p95_recent, s[VIO_STAGE].max_all,
+      (unsigned long long)s[METRIC_PUBLISH].sample_count, s[METRIC_PUBLISH].recent_sample_count,
+      s[METRIC_PUBLISH].p50_recent, s[METRIC_PUBLISH].p95_recent, s[METRIC_PUBLISH].max_all,
+      (unsigned long long)s[RGB_PUBLISH].sample_count, s[RGB_PUBLISH].recent_sample_count,
+      s[RGB_PUBLISH].p50_recent, s[RGB_PUBLISH].p95_recent, s[RGB_PUBLISH].max_all,
+      (unsigned long long)s[PATH_PUBLISH].sample_count, s[PATH_PUBLISH].recent_sample_count,
+      s[PATH_PUBLISH].p50_recent, s[PATH_PUBLISH].p95_recent, s[PATH_PUBLISH].max_all,
+      performance_path_pose_count);
 }
 
 void LIVMapper::logIngestDiagnostics()

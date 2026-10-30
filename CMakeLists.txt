@@ -108,6 +108,8 @@ if(BUILD_TESTING)
   target_include_directories(test_livo_camera_fallback PRIVATE include)
   ament_add_gtest(test_visual_map_growth test/test_visual_map_growth.cpp)
   target_include_directories(test_visual_map_growth PRIVATE include)
+  ament_add_gtest(test_fixed_interval_stats test/test_fixed_interval_stats.cpp)
+  target_include_directories(test_fixed_interval_stats PRIVATE include)
 endif()
 
 
