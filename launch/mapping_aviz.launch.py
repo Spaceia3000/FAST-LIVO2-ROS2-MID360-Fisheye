@@ -26,6 +26,12 @@ def generate_launch_description():
         description="Whether to launch Rviz2",
     )
 
+    rviz_config_arg = DeclareLaunchArgument(
+        "rviz_config_file",
+        default_value=rviz_config_file,
+        description="Path to the RViz configuration file",
+    )
+
     avia_config_arg = DeclareLaunchArgument(
         'avia_params_file',
         default_value=avia_config_cmd,
@@ -50,6 +56,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         use_rviz_arg,
+        rviz_config_arg,
         avia_config_arg,
         camera_config_arg,
         use_respawn_arg,
@@ -100,7 +107,7 @@ def generate_launch_description():
             package="rviz2",
             executable="rviz2",
             name="rviz2",
-            arguments=["-d", rviz_config_file],
+            arguments=["-d", LaunchConfiguration("rviz_config_file")],
             output="screen"
         ),
     ])
